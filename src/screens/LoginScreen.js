@@ -1,419 +1,253 @@
-import React, { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  SafeAreaView,
-  ScrollView,
-  Alert,
-} from 'react-native';
-import { Button } from '../components/ui/Button';
-import { Card } from '../components/ui/Card';
-import { TextInput } from '../components/ui/TextInput';
-import { LoadingSpinner } from '../components/ui/LoadingSpinner';
-import { useTheme } from '../contexts/ThemeContext';
-import { useWebhook } from '../hooks/useWebhook';
-import { useForm } from '../hooks/useForm';
-import { validators } from '../utils/validators';
+import React, { useState } from 'react';
+import { Eye, EyeOff, Lock, Mail, Loader2 } from 'lucide-react';
 
-export default function WebhookSetupScreen({ navigation }) {
-  const { theme } = useTheme();
-  const { 
-    isLoading,     // ...existing code...
-    function handleLogin(event) {
-      event.preventDefault();
-      const username = document.getElementById('username').value;
-      const password = document.getElementById('password').value;
-    
-      // Perform login logic here
-      if (username === 'admin' && password === 'password') {
-        alert('Login successful!');
-      } else {
-        alert('Invalid credentials');
-      }
-    }
-    
-    document.getElementById('loginForm').addEventListener('submit', handleLogin);
-    // ...existing code...    // ...existing code...
-    const Login = () => {
-      return (
-        <div className="dark-mode-container">
-          <h1>Login</h1>
-          <form onSubmit={handleLogin}>
-            <label htmlFor="username">Username:</label>
-            <input type="text" id="username" name="username" required />
-            <br />
-            <label htmlFor="password">Password:</label>
-            <input type="password" id="password" name="password" required />
-            <br />
-            <button type="submit">Login</button>
-          </form>
-        </div>
-      );
-    };
-    
-    export default Login;
-    // ...existing code...    body {
-      font-family; Arial, sans-serif;
-      background-color; #333;
-      color: #fff;
-    }
-    
-    .dark-mode-container {
-      padding: 20px;
-      border-radius: 8px;
-      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-      background-color: #555;
-      color: #fff;
-    }
-    
-    .login-form {
-      display: flex;
-      flex-direction: column;
-    }
-    
-    label {
-      margin-bottom: 10px;
-    }
-    
-    input {
-      padding: 8px;
-      margin-bottom: 20px;
-      border: none;
-      border-radius: 4px;
-    }
-    
-    button {
-      padding: 10px 20px;
-      background-color: #555;
-      color: #fff;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
-    }
-    error, 
-    connectionStatus, 
-    testConnection, 
-    saveConfig, 
-    getConfig 
-  } = useWebhook();
+export default function LoginScreen() {
+  const [formData, setFormData] = useState({
+    email: '',
+    password: '',
+  });
+  const [errors, setErrors] = useState({});
+  const [touched, setTouched] = useState({});
+  const [showPassword, setShowPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [loginStatus, setLoginStatus] = useState('idle'); // idle, loading, success, error
 
-  const {
-    values,
-    errors,
-    touched,
-    setValue,
-    setFieldTouched,
-    handleSubmit,
-    reset,
-  } = useForm(
-    {
-      url: '',
-      apiKey: '',
-      timeout: '30000',
-    },
-    {
-      url: [
-        validators.required('Webhook URL is required'),
-        validators.url('Please enter a valid URL'),
-      ],
-      timeout: [
-        validators.required('Timeout is required'),
-        validators.number('Timeout must be a number'),
-        validators.range(1000, 120000, 'Timeout must be between 1 and 120 seconds'),
-      ],
-    }
-  );
+  const validateEmail = (email) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!email) return 'Email is required';
+    if (!emailRegex.test(email)) return 'Please enter a valid email address';
+    return null;
+  };
 
-  useEffect(() => {
-    // Load existing configuration
-    const config = getConfig();
-    if (config.url) {
-      setValue('url', config.url);
-      setValue('apiKey', config.apiKey || '');
-      setValue('timeout', config.timeout?.toString() || '30000');
-    }
-  }, []);
+  const validatePassword = (password) => {
+    if (!password) return 'Password is required';
+    if (password.length < 6) return 'Password must be at least 6 characters';
+    return null;
+  };
 
-  const handleSave = async (formValues) => {
-    const config = {
-      url: formValues.url,
-      apiKey: formValues.apiKey,
-      timeout: parseInt(formValues.timeout),
-      headers: formValues.apiKey ? {
-        'Authorization': `Bearer ${formValues.apiKey}`,
-        'Content-Type': 'application/json',
-      } : {
-        'Content-Type': 'application/json',
-      },
-    };
-
-    const success = await saveConfig(config);
-    if (success) {
-      Alert.alert(
-        'Success',
-        'Webhook configuration saved successfully!',
-        [
-          { text: 'OK', onPress: () => navigation.goBack() }
-        ]
-      );
-    } else {
-      Alert.alert('Error', 'Failed to save webhook configuration');
+  const handleInputChange = (field, value) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+    
+    // Clear error when user starts typing
+    if (errors[field]) {
+      setErrors(prev => ({ ...prev, [field]: null }));
     }
   };
 
-  const handleTest = async () => {
-    const isValid = await handleSubmit(async () => {
-      const result = await testConnection();
-      
-      if (result.success) {
-        Alert.alert('Success', 'Webhook connection test successful!');
-      } else {
-        Alert.alert('Connection Failed', result.message);
-      }
+  const handleBlur = (field) => {
+    setTouched(prev => ({ ...prev, [field]: true }));
+    
+    let error = null;
+    if (field === 'email') {
+      error = validateEmail(formData.email);
+    } else if (field === 'password') {
+      error = validatePassword(formData.password);
+    }
+    
+    setErrors(prev => ({ ...prev, [field]: error }));
+  };
+
+  const handleLogin = async () => {
+    // Validate all fields
+    const emailError = validateEmail(formData.email);
+    const passwordError = validatePassword(formData.password);
+    
+    setErrors({
+      email: emailError,
+      password: passwordError,
     });
+    
+    setTouched({
+      email: true,
+      password: true,
+    });
+
+    if (emailError || passwordError) {
+      return;
+    }
+
+    setIsLoading(true);
+    setLoginStatus('loading');
+
+    try {
+      // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      // Simulate success/failure (you can change this for testing)
+      const success = Math.random() > 0.3; // 70% success rate for demo
+      
+      if (success) {
+        setLoginStatus('success');
+        // Handle successful login here
+        console.log('Login successful!', formData);
+      } else {
+        setLoginStatus('error');
+        setErrors({ general: 'Invalid email or password. Please try again.' });
+      }
+    } catch (error) {
+      setLoginStatus('error');
+      setErrors({ general: 'Login failed. Please check your connection and try again.' });
+    } finally {
+      setIsLoading(false);
+      if (loginStatus !== 'success') {
+        setTimeout(() => setLoginStatus('idle'), 3000);
+      }
+    }
   };
 
   const getStatusColor = () => {
-    switch (connectionStatus) {
-      case 'connected': return theme.success;
-      case 'error': return theme.error;
-      case 'connecting': return theme.warning;
-      default: return theme.textSecondary;
+    switch (loginStatus) {
+      case 'success': return 'text-green-500';
+      case 'error': return 'text-red-500';
+      case 'loading': return 'text-yellow-500';
+      default: return 'text-gray-500';
     }
   };
 
   const getStatusText = () => {
-    switch (connectionStatus) {
-      case 'connected': return 'Connected';
-      case 'error': return 'Connection Failed';
-      case 'connecting': return 'Testing...';
-      default: return 'Not Connected';
+    switch (loginStatus) {
+      case 'success': return 'Login Successful!';
+      case 'error': return 'Login Failed';
+      case 'loading': return 'Authenticating...';
+      default: return 'Ready to Login';
     }
   };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex items-center justify-center p-4">
+      <div className="w-full max-w-md">
         {/* Header */}
-        <View style={styles.header}>
-          <Text style={[styles.title, { color: theme.text }]}>
-            Webhook Setup
-          </Text>
-          <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
-            Configure your API endpoint for chat responses
-          </Text>
-        </View>
+        <div className="text-center mb-8">
+          <h1 className="text-3xl font-bold text-white mb-2 font-mono">
+            Welcome Back
+          </h1>
+          <p className="text-gray-400 font-mono">
+            Sign in to your account
+          </p>
+        </div>
 
-        {/* Connection Status */}
-        <Card style={styles.statusCard}>
-          <View style={styles.statusRow}>
-            <Text style={[styles.statusLabel, { color: theme.text }]}>
-              Status:
-            </Text>
-            <View style={styles.statusIndicator}>
-              <View 
-                style={[
-                  styles.statusDot, 
-                  { backgroundColor: getStatusColor() }
-                ]} 
-              />
-              <Text style={[styles.statusText, { color: getStatusColor() }]}>
+        {/* Status Card */}
+        <div className="bg-gray-800 rounded-lg p-4 mb-6 border border-gray-700">
+          <div className="flex items-center justify-between">
+            <span className="text-white font-semibold font-mono">Status:</span>
+            <div className="flex items-center">
+              <div className={`w-2 h-2 rounded-full mr-2 ${
+                loginStatus === 'success' ? 'bg-green-500' : 
+                loginStatus === 'error' ? 'bg-red-500' : 
+                loginStatus === 'loading' ? 'bg-yellow-500' : 'bg-gray-500'
+              }`} />
+              <span className={`font-semibold font-mono ${getStatusColor()}`}>
                 {getStatusText()}
-              </Text>
-            </View>
-          </View>
-        </Card>
+              </span>
+            </div>
+          </div>
+        </div>
 
-        {/* Configuration Form */}
-        <Card style={styles.formCard}>
-          <TextInput
-            label="Webhook URL *"
-            placeholder="https://your-api.com/webhook"
-            value={values.url}
-            onChangeText={(text) => setValue('url', text)}
-            onBlur={() => setFieldTouched('url')}
-            error={touched.url ? errors.url : null}
-            autoCapitalize="none"
-            autoCorrect={false}
-          />
+        {/* Login Form */}
+        <div className="bg-gray-800 rounded-lg p-6 border border-gray-700 mb-6">
+          {/* Email Input */}
+          <div className="mb-4">
+            <label className="block text-white font-semibold mb-2 font-mono">
+              Email Address *
+            </label>
+            <div className="relative">
+              <Mail className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
+              <input
+                type="email"
+                placeholder="Enter your email"
+                value={formData.email}
+                onChange={(e) => handleInputChange('email', e.target.value)}
+                onBlur={() => handleBlur('email')}
+                className={`w-full pl-10 pr-4 py-3 bg-gray-700 border rounded-lg text-white font-mono placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                  touched.email && errors.email ? 'border-red-500' : 'border-gray-600'
+                }`}
+                autoComplete="email"
+              />
+            </div>
+            {touched.email && errors.email && (
+              <p className="mt-2 text-red-400 text-sm font-mono">{errors.email}</p>
+            )}
+          </div>
 
-          <TextInput
-            label="API Key (Optional)"
-            placeholder="Enter your API key"
-            value={values.apiKey}
-            onChangeText={(text) => setValue('apiKey', text)}
-            onBlur={() => setFieldTouched('apiKey')}
-            secureTextEntry
-            autoCapitalize="none"
-            autoCorrect={false}
-          />
+          {/* Password Input */}
+          <div className="mb-6">
+            <label className="block text-white font-semibold mb-2 font-mono">
+              Password *
+            </label>
+            <div className="relative">
+              <Lock className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
+              <input
+                type={showPassword ? 'text' : 'password'}
+                placeholder="Enter your password"
+                value={formData.password}
+                onChange={(e) => handleInputChange('password', e.target.value)}
+                onBlur={() => handleBlur('password')}
+                className={`w-full pl-10 pr-12 py-3 bg-gray-700 border rounded-lg text-white font-mono placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                  touched.password && errors.password ? 'border-red-500' : 'border-gray-600'
+                }`}
+                autoComplete="current-password"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-3 text-gray-400 hover:text-gray-300"
+              >
+                {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+              </button>
+            </div>
+            {touched.password && errors.password && (
+              <p className="mt-2 text-red-400 text-sm font-mono">{errors.password}</p>
+            )}
+          </div>
 
-          <TextInput
-            label="Timeout (ms) *"
-            placeholder="30000"
-            value={values.timeout}
-            onChangeText={(text) => setValue('timeout', text)}
-            onBlur={() => setFieldTouched('timeout')}
-            error={touched.timeout ? errors.timeout : null}
-            keyboardType="numeric"
-          />
-
-          {error && (
-            <View style={styles.errorContainer}>
-              <Text style={[styles.errorText, { color: theme.error }]}>
-                {error}
-              </Text>
-            </View>
+          {/* General Error */}
+          {errors.general && (
+            <div className="mb-4 p-3 bg-red-900/20 border border-red-500/20 rounded-lg">
+              <p className="text-red-400 text-sm font-mono">{errors.general}</p>
+            </div>
           )}
-        </Card>
 
-        {/* Action Buttons */}
-        <View style={styles.buttonContainer}>
-          <Button
-            title="Test Connection"
-            variant="secondary"
-            onPress={handleTest}
-            disabled={isLoading || !values.url}
-            loading={isLoading}
-            style={styles.button}
-          />
-          
-          <Button
-            title="Save Configuration"
-            variant="primary"
-            onPress={() => handleSubmit(handleSave)}
+          {/* Login Button */}
+          <button
+            onClick={handleLogin}
             disabled={isLoading}
-            style={styles.button}
-          />
-        </View>
+            className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-800 disabled:cursor-not-allowed text-white font-semibold py-3 px-4 rounded-lg transition duration-200 font-mono flex items-center justify-center"
+          >
+            {isLoading ? (
+              <>
+                <Loader2 className="animate-spin h-5 w-5 mr-2" />
+                Signing In...
+              </>
+            ) : (
+              'Sign In'
+            )}
+          </button>
+
+          {/* Forgot Password Link */}
+          <div className="mt-4 text-center">
+            <button className="text-blue-400 hover:text-blue-300 text-sm font-mono transition duration-200">
+              Forgot your password?
+            </button>
+          </div>
+        </div>
 
         {/* Help Section */}
-        <Card style={styles.helpCard}>
-          <Text style={[styles.helpTitle, { color: theme.text }]}>
-            How it works
-          </Text>
-          <Text style={[styles.helpText, { color: theme.textSecondary }]}>
-            Your webhook will receive POST requests with the user's message and should respond with JSON containing a "message" field.
-          </Text>
-          <View style={styles.codeExample}>
-            <Text style={[styles.codeText, { color: theme.textSecondary }]}>
-              Expected Response Format:
-            </Text>
-            <Text style={[styles.code, { color: theme.text, backgroundColor: theme.inputBackground }]}>
-              {`{\n  "message": "Your AI response here"\n}`}
-            </Text>
-          </View>
-        </Card>
-
-      </ScrollView>
-    </SafeAreaView>
+        <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
+          <h3 className="text-white font-bold mb-3 font-mono">Need Help?</h3>
+          <p className="text-gray-400 text-sm font-mono mb-4">
+            Having trouble signing in? Make sure you're using the correct email address and password.
+          </p>
+          <div className="space-y-2">
+            <div className="text-xs font-mono text-gray-500">
+              Demo credentials (for testing):
+            </div>
+            <div className="bg-gray-700 p-3 rounded text-xs font-mono text-gray-300 border border-gray-600">
+              Email: demo@example.com<br />
+              Password: demo123
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  header: {
-    paddingHorizontal: 20,
-    paddingVertical: 20,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    fontFamily: 'JetBrains Mono',
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 16,
-    lineHeight: 22,
-    fontFamily: 'JetBrains Mono',
-  },
-  statusCard: {
-    marginHorizontal: 20,
-    marginBottom: 16,
-  },
-  statusRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  statusLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-    fontFamily: 'JetBrains Mono',
-  },
-  statusIndicator: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  statusDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginRight: 8,
-  },
-  statusText: {
-    fontSize: 14,
-    fontWeight: '600',
-    fontFamily: 'JetBrains Mono',
-  },
-  formCard: {
-    marginHorizontal: 20,
-    marginBottom: 16,
-  },
-  errorContainer: {
-    marginTop: 8,
-    padding: 12,
-    borderRadius: 8,
-    backgroundColor: 'rgba(239, 68, 68, 0.1)',
-  },
-  errorText: {
-    fontSize: 14,
-    fontFamily: 'JetBrains Mono',
-  },
-  buttonContainer: {
-    paddingHorizontal: 20,
-    marginBottom: 16,
-  },
-  button: {
-    marginBottom: 12,
-  },
-  helpCard: {
-    marginHorizontal: 20,
-    marginBottom: 20,
-  },
-  helpTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 12,
-    fontFamily: 'JetBrains Mono',
-  },
-  helpText: {
-    fontSize: 14,
-    lineHeight: 20,
-    marginBottom: 16,
-    fontFamily: 'JetBrains Mono',
-  },
-  codeExample: {
-    marginTop: 8,
-  },
-  codeText: {
-    fontSize: 12,
-    marginBottom: 8,
-    fontFamily: 'JetBrains Mono',
-  },
-  code: {
-    fontSize: 12,
-    fontFamily: 'JetBrains Mono',
-    padding: 12,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: '#404040',
-  },
-});
