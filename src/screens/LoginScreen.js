@@ -19,7 +19,78 @@ import { validators } from '../utils/validators';
 export default function WebhookSetupScreen({ navigation }) {
   const { theme } = useTheme();
   const { 
-    isLoading, 
+    isLoading,     // ...existing code...
+    function handleLogin(event) {
+      event.preventDefault();
+      const username = document.getElementById('username').value;
+      const password = document.getElementById('password').value;
+    
+      // Perform login logic here
+      if (username === 'admin' && password === 'password') {
+        alert('Login successful!');
+      } else {
+        alert('Invalid credentials');
+      }
+    }
+    
+    document.getElementById('loginForm').addEventListener('submit', handleLogin);
+    // ...existing code...    // ...existing code...
+    const Login = () => {
+      return (
+        <div className="dark-mode-container">
+          <h1>Login</h1>
+          <form onSubmit={handleLogin}>
+            <label htmlFor="username">Username:</label>
+            <input type="text" id="username" name="username" required />
+            <br />
+            <label htmlFor="password">Password:</label>
+            <input type="password" id="password" name="password" required />
+            <br />
+            <button type="submit">Login</button>
+          </form>
+        </div>
+      );
+    };
+    
+    export default Login;
+    // ...existing code...    body {
+      font-family; Arial, sans-serif;
+      background-color; #333;
+      color: #fff;
+    }
+    
+    .dark-mode-container {
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+      background-color: #555;
+      color: #fff;
+    }
+    
+    .login-form {
+      display: flex;
+      flex-direction: column;
+    }
+    
+    label {
+      margin-bottom: 10px;
+    }
+    
+    input {
+      padding: 8px;
+      margin-bottom: 20px;
+      border: none;
+      border-radius: 4px;
+    }
+    
+    button {
+      padding: 10px 20px;
+      background-color: #555;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
     error, 
     connectionStatus, 
     testConnection, 
