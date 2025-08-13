@@ -1,18 +1,25 @@
 import React, { useState } from 'react';
-import { Settings, Webhook, X, LogOut } from 'lucide-react';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  ScrollView,
+  StyleSheet,
+  SafeAreaView,
+  StatusBar,
+  Switch,
+  Alert,
+  Image,
+} from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
 import { useThemeContext } from '../contexts/ThemeContext';
-const WebhookSetupScreen = () => {
-  // Component implementation
-};
-
-interface SettingsScreenProps {
-  onClose: () => void;
-};
 
 interface SettingsScreenProps {
   onClose: () => void;
   onLogout: () => void;
   user: {
+    id: string;
     name: string;
     email: string;
     avatar: string;
@@ -41,151 +48,454 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ onClose, onLogout, user
     setSettings(prev => ({ ...prev, [key]: value }));
   };
 
+  const handleLogout = () => {
+    Alert.alert(
+      'Logout',
+      'Are you sure you want to logout?',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel'
+        },
+        {
+          text: 'Logout',
+          style: 'destructive',
+          onPress: onLogout
+        }
+      ]
+    );
+  };
+
+  const handleMessageHistoryChange = () => {
+    Alert.alert(
+      'Message History',
+      'Select message history limit',
+      [
+        { text: '50 messages', onPress: () => updateSetting('messageHistory', 50) },
+        { text: '100 messages', onPress: () => updateSetting('messageHistory', 100) },
+        { text: '500 messages', onPress: () => updateSetting('messageHistory', 500) },
+        { text: '1000 messages', onPress: () => updateSetting('messageHistory', 1000) },
+        { text: 'Cancel', style: 'cancel' }
+      ]
+    );
+  };
+
   const tabs = [
-    { id: 'general', label: 'General', icon: Settings },
-    { id: 'webhooks', label: 'Webhooks', icon: Webhook },
+    { id: 'general', label: 'General', icon: 'settings-outline' },
+    { id: 'webhooks', label: 'Webhooks', icon: 'link-outline' },
   ];
 
   return (
-    <div className="bg-gray-800 border-l border-gray-700 w-96 flex flex-col">
-      {/* Header */}
-      <div className="p-4 border-b border-gray-700">
-        <div className="flex items-center justify-between">
-          <h2 className="text-xl font-semibold text-white">Settings</h2>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-300 p-1"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-      </div>
+    <LinearGradient
+      colors={['#0f0f23', '#1a1a2e', '#16213e']}
+      style={styles.container}
+    >
+      <SafeAreaView style={styles.safeArea}>
+        <StatusBar barStyle="light-content" backgroundColor="#0f0f23" />
+        
+        {/* Header */}
+        <LinearGradient
+          colors={['rgba(17, 24, 39, 0.95)', 'rgba(31, 41, 55, 0.9)']}
+          style={styles.header}
+        >
+          <View style={styles.headerContent}>
+            <Text style={styles.headerTitle}>Settings</Text>
+            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+              <Ionicons name="close" size={24} color="#9ca3af" />
+            </TouchableOpacity>
+          </View>
+        </LinearGradient>
 
-      {/* User Info */}
-      <div className="p-4 border-b border-gray-700">
-        <div className="flex items-center space-x-3">
-          <img
-            src={user.avatar}
-            alt={user.name}
-            className="w-10 h-10 rounded-full"
-          />
-          <div>
-            <p className="text-white font-medium">{user.name}</p>
-            <p className="text-gray-400 text-sm">{user.email}</p>
-          </div>
-        </div>
-      </div>
-
-      {/* Tabs */}
-      <div className="flex border-b border-gray-700">
-        {tabs.map((tab) => {
-          const Icon = tab.icon;
-          return (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`flex-1 flex items-center justify-center space-x-2 py-3 px-4 text-sm font-medium transition-colors ${
-                activeTab === tab.id
-                  ? 'text-purple-400 border-b-2 border-purple-400 bg-gray-700/50'
-                  : 'text-gray-400 hover:text-gray-300'
-              }`}
+        {/* User Info */}
+        <LinearGradient
+          colors={['rgba(17, 24, 39, 0.8)', 'rgba(31, 41, 55, 0.7)']}
+          style={styles.userSection}
+        >
+          <View style={styles.userInfo}>
+            <LinearGradient
+              colors={['#8b5cf6', '#a855f7']}
+              style={styles.userAvatar}
             >
-              <Icon className="w-4 h-4" />
-              <span>{tab.label}</span>
-            </button>
-          );
-        })}
-      </div>
+              <Text style={styles.userAvatarText}>
+                {user.name.charAt(0).toUpperCase()}
+              </Text>
+            </LinearGradient>
+            <View style={styles.userDetails}>
+              <Text style={styles.userName}>{user.name}</Text>
+              <Text style={styles.userEmail}>{user.email}</Text>
+            </View>
+          </View>
+        </LinearGradient>
 
-      {/* Content */}
-      <div className="flex-1 overflow-y-auto p-4">
-        {activeTab === 'general' && (
-          <div className="space-y-6">
-            <h3 className="text-lg font-semibold text-white mb-4">General Settings</h3>
-            
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-white font-medium">Dark Mode</p>
-                  <p className="text-gray-400 text-sm">Toggle dark/light theme</p>
-                </div>
-                <button
-                  onClick={toggleTheme}
-                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                    isDark ? 'bg-purple-500' : 'bg-gray-600'
-                  }`}
+        {/* Tabs */}
+        <View style={styles.tabContainer}>
+          {tabs.map((tab) => (
+            <TouchableOpacity
+              key={tab.id}
+              onPress={() => setActiveTab(tab.id)}
+              style={[
+                styles.tab,
+                activeTab === tab.id && styles.activeTab
+              ]}
+            >
+              <Ionicons 
+                name={tab.icon as any} 
+                size={18} 
+                color={activeTab === tab.id ? '#8b5cf6' : '#9ca3af'} 
+              />
+              <Text style={[
+                styles.tabText,
+                activeTab === tab.id && styles.activeTabText
+              ]}>
+                {tab.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {/* Content */}
+        <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+          {activeTab === 'general' && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>General Settings</Text>
+              
+              <View style={styles.settingsList}>
+                {/* Dark Mode */}
+                <LinearGradient
+                  colors={['rgba(17, 24, 39, 0.8)', 'rgba(31, 41, 55, 0.6)']}
+                  style={styles.settingItem}
                 >
-                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                    isDark ? 'translate-x-6' : 'translate-x-1'
-                  }`} />
-                </button>
-              </div>
+                  <View style={styles.settingInfo}>
+                    <View style={styles.settingIcon}>
+                      <Ionicons name="moon-outline" size={20} color="#8b5cf6" />
+                    </View>
+                    <View style={styles.settingDetails}>
+                      <Text style={styles.settingTitle}>Dark Mode</Text>
+                      <Text style={styles.settingDescription}>Toggle dark/light theme</Text>
+                    </View>
+                  </View>
+                  <Switch
+                    value={isDark}
+                    onValueChange={toggleTheme}
+                    trackColor={{ false: '#374151', true: '#8b5cf6' }}
+                    thumbColor={isDark ? '#ffffff' : '#f4f4f5'}
+                  />
+                </LinearGradient>
 
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-white font-medium">Notifications</p>
-                  <p className="text-gray-400 text-sm">Receive message notifications</p>
-                </div>
-                <button
-                  onClick={() => updateSetting('notifications', !settings.notifications)}
-                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                    settings.notifications ? 'bg-purple-500' : 'bg-gray-600'
-                  }`}
+                {/* Notifications */}
+                <LinearGradient
+                  colors={['rgba(17, 24, 39, 0.8)', 'rgba(31, 41, 55, 0.6)']}
+                  style={styles.settingItem}
                 >
-                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                    settings.notifications ? 'translate-x-6' : 'translate-x-1'
-                  }`} />
-                </button>
-              </div>
+                  <View style={styles.settingInfo}>
+                    <View style={styles.settingIcon}>
+                      <Ionicons name="notifications-outline" size={20} color="#8b5cf6" />
+                    </View>
+                    <View style={styles.settingDetails}>
+                      <Text style={styles.settingTitle}>Notifications</Text>
+                      <Text style={styles.settingDescription}>Receive message notifications</Text>
+                    </View>
+                  </View>
+                  <Switch
+                    value={settings.notifications}
+                    onValueChange={(value) => updateSetting('notifications', value)}
+                    trackColor={{ false: '#374151', true: '#8b5cf6' }}
+                    thumbColor={settings.notifications ? '#ffffff' : '#f4f4f5'}
+                  />
+                </LinearGradient>
 
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-white font-medium">Sound Effects</p>
-                  <p className="text-gray-400 text-sm">Play sounds for messages</p>
-                </div>
-                <button
-                  onClick={() => updateSetting('soundEnabled', !settings.soundEnabled)}
-                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                    settings.soundEnabled ? 'bg-purple-500' : 'bg-gray-600'
-                  }`}
+                {/* Sound Effects */}
+                <LinearGradient
+                  colors={['rgba(17, 24, 39, 0.8)', 'rgba(31, 41, 55, 0.6)']}
+                  style={styles.settingItem}
                 >
-                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                    settings.soundEnabled ? 'translate-x-6' : 'translate-x-1'
-                  }`} />
-                </button>
-              </div>
+                  <View style={styles.settingInfo}>
+                    <View style={styles.settingIcon}>
+                      <Ionicons name="volume-high-outline" size={20} color="#8b5cf6" />
+                    </View>
+                    <View style={styles.settingDetails}>
+                      <Text style={styles.settingTitle}>Sound Effects</Text>
+                      <Text style={styles.settingDescription}>Play sounds for messages</Text>
+                    </View>
+                  </View>
+                  <Switch
+                    value={settings.soundEnabled}
+                    onValueChange={(value) => updateSetting('soundEnabled', value)}
+                    trackColor={{ false: '#374151', true: '#8b5cf6' }}
+                    thumbColor={settings.soundEnabled ? '#ffffff' : '#f4f4f5'}
+                  />
+                </LinearGradient>
 
-              <div>
-                <label className="block text-white font-medium mb-2">
-                  Message History Limit
-                </label>
-                <select
-                  value={settings.messageHistory}
-                  onChange={(e) => updateSetting('messageHistory', parseInt(e.target.value))}
-                  className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                {/* Auto Save */}
+                <LinearGradient
+                  colors={['rgba(17, 24, 39, 0.8)', 'rgba(31, 41, 55, 0.6)']}
+                  style={styles.settingItem}
                 >
-                  <option value={50}>50 messages</option>
-                  <option value={100}>100 messages</option>
-                  <option value={500}>500 messages</option>
-                  <option value={1000}>1000 messages</option>
-                </select>
-              </div>
-            </div>
-          </div>
-        )}
+                  <View style={styles.settingInfo}>
+                    <View style={styles.settingIcon}>
+                      <Ionicons name="save-outline" size={20} color="#8b5cf6" />
+                    </View>
+                    <View style={styles.settingDetails}>
+                      <Text style={styles.settingTitle}>Auto Save</Text>
+                      <Text style={styles.settingDescription}>Automatically save conversations</Text>
+                    </View>
+                  </View>
+                  <Switch
+                    value={settings.autoSave}
+                    onValueChange={(value) => updateSetting('autoSave', value)}
+                    trackColor={{ false: '#374151', true: '#8b5cf6' }}
+                    thumbColor={settings.autoSave ? '#ffffff' : '#f4f4f5'}
+                  />
+                </LinearGradient>
 
-        {activeTab === 'webhooks' && (
-          <div className="space-y-6">
-            <h3 className="text-lg font-semibold text-white mb-4">Webhook Settings</h3>
+                {/* Message History */}
+                <TouchableOpacity onPress={handleMessageHistoryChange}>
+                  <LinearGradient
+                    colors={['rgba(17, 24, 39, 0.8)', 'rgba(31, 41, 55, 0.6)']}
+                    style={styles.settingItem}
+                  >
+                    <View style={styles.settingInfo}>
+                      <View style={styles.settingIcon}>
+                        <Ionicons name="time-outline" size={20} color="#8b5cf6" />
+                      </View>
+                      <View style={styles.settingDetails}>
+                        <Text style={styles.settingTitle}>Message History Limit</Text>
+                        <Text style={styles.settingDescription}>
+                          {settings.messageHistory} messages
+                        </Text>
+                      </View>
+                    </View>
+                    <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
+                  </LinearGradient>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
 
-            <div className="space-y-4">
-              {/* Add your webhook settings here */}
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
+          {activeTab === 'webhooks' && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Webhook Settings</Text>
+              
+              <LinearGradient
+                colors={['rgba(17, 24, 39, 0.8)', 'rgba(31, 41, 55, 0.6)']}
+                style={styles.comingSoonContainer}
+              >
+                <Ionicons name="construct-outline" size={40} color="#8b5cf6" />
+                <Text style={styles.comingSoonTitle}>Coming Soon</Text>
+                <Text style={styles.comingSoonText}>
+                  Webhook management features will be available in a future update
+                </Text>
+              </LinearGradient>
+            </View>
+          )}
+        </ScrollView>
+
+        {/* Logout Button */}
+        <View style={styles.footer}>
+          <TouchableOpacity onPress={handleLogout} style={styles.logoutButton}>
+            <LinearGradient
+              colors={['#dc2626', '#b91c1c']}
+              style={styles.logoutButtonGradient}
+            >
+              <Ionicons name="log-out-outline" size={20} color="white" />
+              <Text style={styles.logoutButtonText}>Logout</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    </LinearGradient>
   );
 };
 
-export default SettingsScreen
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  safeArea: {
+    flex: 1,
+  },
+  header: {
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(75, 85, 99, 0.3)',
+  },
+  headerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  headerTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#f9fafb',
+  },
+  closeButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(75, 85, 99, 0.3)',
+  },
+  userSection: {
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(75, 85, 99, 0.3)',
+  },
+  userInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  userAvatar: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  userAvatarText: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: 'white',
+  },
+  userDetails: {
+    flex: 1,
+  },
+  userName: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#f9fafb',
+    marginBottom: 2,
+  },
+  userEmail: {
+    fontSize: 14,
+    color: '#9ca3af',
+  },
+  tabContainer: {
+    flexDirection: 'row',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(75, 85, 99, 0.3)',
+  },
+  tab: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    gap: 8,
+  },
+  activeTab: {
+    borderBottomWidth: 2,
+    borderBottomColor: '#8b5cf6',
+    backgroundColor: 'rgba(139, 92, 246, 0.1)',
+  },
+  tabText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#9ca3af',
+  },
+  activeTabText: {
+    color: '#8b5cf6',
+  },
+  content: {
+    flex: 1,
+    paddingHorizontal: 20,
+  },
+  section: {
+    paddingVertical: 20,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#f9fafb',
+    marginBottom: 20,
+  },
+  settingsList: {
+    gap: 12,
+  },
+  settingItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(75, 85, 99, 0.3)',
+  },
+  settingInfo: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  settingIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(139, 92, 246, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  settingDetails: {
+    flex: 1,
+  },
+  settingTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#f9fafb',
+    marginBottom: 2,
+  },
+  settingDescription: {
+    fontSize: 14,
+    color: '#9ca3af',
+  },
+  comingSoonContainer: {
+    alignItems: 'center',
+    padding: 40,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(75, 85, 99, 0.3)',
+  },
+  comingSoonTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#f9fafb',
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  comingSoonText: {
+    fontSize: 14,
+    color: '#9ca3af',
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  footer: {
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(75, 85, 99, 0.3)',
+  },
+  logoutButton: {
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
+  logoutButtonGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    gap: 12,
+  },
+  logoutButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: 'white',
+  },
+});
+
+export default SettingsScreen;

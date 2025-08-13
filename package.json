@@ -15,14 +15,15 @@
     "@react-navigation/stack": "^7.4.5",
     "axios": "^1.11.0",
     "expo": "~53.0.20",
+    "expo-blur": "^14.1.5",
+    "expo-linear-gradient": "~14.1.5",
     "expo-status-bar": "~2.2.3",
     "lucide-react": "^0.539.0",
     "react": "19.0.0",
     "react-native": "0.79.5",
     "react-native-keyboard-aware-scroll-view": "^0.9.5",
     "react-native-safe-area-context": "5.4.0",
-    "react-native-screens": "~4.11.1",
-    "expo-linear-gradient": "~14.1.5"
+    "react-native-screens": "~4.11.1"
   },
   "devDependencies": {
     "@babel/core": "^7.20.0",
