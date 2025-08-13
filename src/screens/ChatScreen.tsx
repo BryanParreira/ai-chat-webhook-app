@@ -341,8 +341,6 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ user, onLogout = () => {} }) =>
       addMessage({
         text: randomResponse,
         sender: 'bot',
-        timestamp: new Date(),
-        id: Date.now().toString(),
       });
       setIsTyping(false);
       
@@ -463,14 +461,6 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ user, onLogout = () => {} }) =>
                   </View>
                 </View>
               )}
-
-              {messages.map((message) => (
-                <MessageBubble
-                  key={message.id}
-                  message={message}
-                  isUser={message.sender === 'user'}
-                />
-              ))}
               
               {isTyping && <TypingIndicator />}
               
