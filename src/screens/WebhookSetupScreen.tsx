@@ -1,8 +1,27 @@
 import React, { useState } from 'react';
-import { Plus, Trash2, Settings as SettingsIcon, Check, Webhook } from 'lucide-react';
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  ScrollView,
+  StyleSheet,
+  Alert,
+  Switch,
+  Modal,
+  KeyboardAvoidingView,
+  Platform,
+  SafeAreaView,
+  StatusBar,
+} from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useWebhookContext } from '../contexts/WebhookContext';
 
-const WebhookSetupScreen: React.FC = () => {
+interface WebhookSetupScreenProps {
+  onClose: () => void;
+}
+
+const WebhookSetupScreen: React.FC<WebhookSetupScreenProps> = ({ onClose }) => {
   const { webhooks, addWebhook, updateWebhook, deleteWebhook, testWebhook } = useWebhookContext();
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -11,7 +30,7 @@ const WebhookSetupScreen: React.FC = () => {
   const [formData, setFormData] = useState({
     name: '',
     url: '',
-    method: 'POST',
+    method: 'POST' as 'POST' | 'PUT' | 'PATCH',
     headers: '{"Content-Type": "application/json"}',
     body: '{"message": "{{message}}", "user": "{{user}}", "timestamp": "{{timestamp}}"}',
     active: true
@@ -30,14 +49,48 @@ const WebhookSetupScreen: React.FC = () => {
     setEditingId(null);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (editingId) {
-      updateWebhook(editingId, formData);
-    } else {
-      addWebhook(formData);
+  const handleSubmit = async () => {
+    if (!formData.name.trim() || !formData.url.trim()) {
+      Alert.alert('Error', 'Please fill in all required fields');
+      return;
     }
-    resetForm();
+
+    // Validate URL format
+    try {
+      new URL(formData.url);
+    } catch (error) {
+      Alert.alert('Error', 'Please enter a valid URL (must start with http:// or https://)');
+      return;
+    }
+
+    try {
+      // Validate JSON headers
+      JSON.parse(formData.headers);
+    } catch (e) {
+      Alert.alert('Error', 'Invalid JSON format in headers');
+      return;
+    }
+
+    try {
+      // Validate JSON body
+      JSON.parse(formData.body);
+    } catch (e) {
+      Alert.alert('Error', 'Invalid JSON format in body');
+      return;
+    }
+
+    try {
+      if (editingId) {
+        await updateWebhook(editingId, formData);
+        Alert.alert('Success', 'Webhook updated successfully!');
+      } else {
+        await addWebhook(formData);
+        Alert.alert('Success', 'Webhook created successfully!');
+      }
+      resetForm();
+    } catch (error) {
+      Alert.alert('Error', 'Failed to save webhook. Please try again.');
+    }
   };
 
   const handleEdit = (webhook: any) => {
@@ -45,7 +98,7 @@ const WebhookSetupScreen: React.FC = () => {
       name: webhook.name,
       url: webhook.url,
       method: webhook.method,
-      headers: webhook.headers,
+      headers: typeof webhook.headers === 'string' ? webhook.headers : JSON.stringify(webhook.headers),
       body: webhook.body,
       active: webhook.active
     });
@@ -55,218 +108,604 @@ const WebhookSetupScreen: React.FC = () => {
 
   const handleTest = async (webhook: any) => {
     setTestResults({ ...testResults, [webhook.id]: { testing: true } });
-    const result = await testWebhook(webhook);
-    setTestResults({ ...testResults, [webhook.id]: result });
-    
-    // Clear test result after 3 seconds
-    setTimeout(() => {
-      setTestResults(prev => {
-        const newResults = { ...prev };
-        delete newResults[webhook.id];
-        return newResults;
+    try {
+      const result = await testWebhook(webhook);
+      setTestResults({ ...testResults, [webhook.id]: result });
+      
+      // Clear test result after 3 seconds
+      setTimeout(() => {
+        setTestResults(prev => {
+          const newResults = { ...prev };
+          delete newResults[webhook.id];
+          return newResults;
+        });
+      }, 3000);
+    } catch (error) {
+      setTestResults({ 
+        ...testResults, 
+        [webhook.id]: { 
+          testing: false, 
+          success: false, 
+          error: 'Test failed' 
+        } 
       });
-    }, 3000);
+    }
+  };
+
+  const handleDelete = (webhook: any) => {
+    Alert.alert(
+      'Delete Webhook',
+      `Are you sure you want to delete "${webhook.name}"?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Delete', 
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteWebhook(webhook.id);
+              Alert.alert('Success', 'Webhook deleted successfully');
+            } catch (error) {
+              Alert.alert('Error', 'Failed to delete webhook');
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  const methodOptions: ('POST' | 'PUT' | 'PATCH')[] = ['POST', 'PUT', 'PATCH'];
+
+  const selectMethod = () => {
+    Alert.alert(
+      'Select Method',
+      'Choose HTTP method for this webhook',
+      methodOptions.map(method => ({
+        text: method,
+        onPress: () => setFormData({ ...formData, method })
+      }))
+    );
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold text-white">Webhook Settings</h3>
-        <button
-          onClick={() => setIsAdding(true)}
-          className="bg-gradient-to-r from-purple-500 to-violet-500 text-white px-4 py-2 rounded-lg flex items-center space-x-2 hover:from-purple-600 hover:to-violet-600 transition-all"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Add Webhook</span>
-        </button>
-      </div>
+    <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="light-content" backgroundColor="#0D0D0D" />
+      
+      {/* Header */}
+      <View style={styles.header}>
+        <View style={styles.headerContent}>
+          <Text style={styles.headerTitle}>Webhook Settings</Text>
+          <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+            <Ionicons name="close" size={22} color="#9CA3AF" />
+          </TouchableOpacity>
+        </View>
+      </View>
 
-      {isAdding && (
-        <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
-          <h4 className="text-white font-medium mb-4">
-            {editingId ? 'Edit Webhook' : 'Add New Webhook'}
-          </h4>
-          
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="block text-gray-300 text-sm font-medium mb-2">
-                Name
-              </label>
-              <input
-                type="text"
-                value={formData.name}
-                onChange={(e) => setFormData({...formData, name: e.target.value})}
-                className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
-                required
-                placeholder="My Webhook"
-              />
-            </div>
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        {/* Add Webhook Button */}
+        <View style={styles.addButtonContainer}>
+          <TouchableOpacity
+            onPress={() => setIsAdding(true)}
+            style={styles.addButton}
+          >
+            <Ionicons name="add" size={20} color="#FFFFFF" />
+            <Text style={styles.addButtonText}>Add Webhook</Text>
+          </TouchableOpacity>
+        </View>
 
-            <div>
-              <label className="block text-gray-300 text-sm font-medium mb-2">
-                URL
-              </label>
-              <input
-                type="url"
-                value={formData.url}
-                onChange={(e) => setFormData({...formData, url: e.target.value})}
-                className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
-                required
-                placeholder="https://your-webhook-url.com/endpoint"
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-gray-300 text-sm font-medium mb-2">
-                  Method
-                </label>
-                <select
-                  value={formData.method}
-                  onChange={(e) => setFormData({...formData, method: e.target.value})}
-                  className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
-                >
-                  <option value="POST">POST</option>
-                  <option value="PUT">PUT</option>
-                  <option value="PATCH">PATCH</option>
-                </select>
-              </div>
-
-              <div className="flex items-center space-x-2 pt-6">
-                <input
-                  type="checkbox"
-                  id="active"
-                  checked={formData.active}
-                  onChange={(e) => setFormData({...formData, active: e.target.checked})}
-                  className="rounded border-gray-600 bg-gray-700 text-purple-500 focus:ring-purple-500 focus:ring-offset-gray-800"
-                />
-                <label htmlFor="active" className="text-gray-300 text-sm">
-                  Active
-                </label>
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-gray-300 text-sm font-medium mb-2">
-                Headers (JSON)
-              </label>
-              <textarea
-                value={formData.headers}
-                onChange={(e) => setFormData({...formData, headers: e.target.value})}
-                rows={3}
-                className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-purple-500 font-mono text-sm"
-                placeholder='{"Authorization": "Bearer your-token"}'
-              />
-            </div>
-
-            <div>
-              <label className="block text-gray-300 text-sm font-medium mb-2">
-                Body Template (JSON)
-              </label>
-              <textarea
-                value={formData.body}
-                onChange={(e) => setFormData({...formData, body: e.target.value})}
-                rows={4}
-                className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-purple-500 font-mono text-sm"
-              />
-              <p className="text-gray-400 text-xs mt-1">
-                Use {"{{message}}"} for message content, {"{{user}}"} for username, {"{{timestamp}}"} for timestamp
-              </p>
-            </div>
-
-            <div className="flex space-x-3">
-              <button
-                type="submit"
-                className="bg-gradient-to-r from-purple-500 to-violet-500 text-white px-4 py-2 rounded-lg hover:from-purple-600 hover:to-violet-600 transition-all"
-              >
-                {editingId ? 'Update' : 'Create'} Webhook
-              </button>
-              <button
-                type="button"
-                onClick={resetForm}
-                className="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-all"
-              >
-                Cancel
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
-
-      {/* Webhook List */}
-      <div className="space-y-3">
-        {webhooks.map((webhook) => (
-          <div key={webhook.id} className="bg-gray-800 rounded-lg p-4 border border-gray-700">
-            <div className="flex items-center justify-between">
-              <div className="flex-1">
-                <div className="flex items-center space-x-3">
-                  <h4 className="text-white font-medium">{webhook.name}</h4>
-                  <span className={`px-2 py-1 text-xs rounded-full ${
-                    webhook.active 
-                      ? 'bg-green-900 text-green-300' 
-                      : 'bg-gray-700 text-gray-400'
-                  }`}>
-                    {webhook.active ? 'Active' : 'Inactive'}
-                  </span>
-                </div>
-                <p className="text-gray-400 text-sm mt-1">{webhook.url}</p>
-                <p className="text-gray-500 text-xs">
-                  {webhook.method} • Created {new Date(webhook.createdAt).toLocaleDateString()}
-                </p>
+        {/* Webhook List */}
+        <View style={styles.webhooksList}>
+          {webhooks.map((webhook) => (
+            <View key={webhook.id} style={styles.webhookCard}>
+              <View style={styles.webhookHeader}>
+                <View style={styles.webhookInfo}>
+                  <Text style={styles.webhookName}>{webhook.name}</Text>
+                  <View style={[
+                    styles.statusBadge,
+                    webhook.active ? styles.statusActive : styles.statusInactive
+                  ]}>
+                    <Text style={[
+                      styles.statusText,
+                      webhook.active ? styles.statusTextActive : styles.statusTextInactive
+                    ]}>
+                      {webhook.active ? 'Active' : 'Inactive'}
+                    </Text>
+                  </View>
+                </View>
                 
-                {testResults[webhook.id] && (
-                  <div className={`mt-2 p-2 rounded text-sm ${
-                    testResults[webhook.id].testing 
-                      ? 'bg-yellow-900 text-yellow-300' 
-                      : testResults[webhook.id].success 
-                        ? 'bg-green-900 text-green-300' 
-                        : 'bg-red-900 text-red-300'
-                  }`}>
+                <View style={styles.webhookActions}>
+                  <TouchableOpacity
+                    onPress={() => handleTest(webhook)}
+                    disabled={testResults[webhook.id]?.testing}
+                    style={[styles.actionButton, styles.testButton]}
+                  >
+                    <Ionicons 
+                      name={testResults[webhook.id]?.testing ? "hourglass" : "checkmark"} 
+                      size={16} 
+                      color="#3B82F6" 
+                    />
+                  </TouchableOpacity>
+                  
+                  <TouchableOpacity
+                    onPress={() => handleEdit(webhook)}
+                    style={[styles.actionButton, styles.editButton]}
+                  >
+                    <Ionicons name="settings-outline" size={16} color="#9CA3AF" />
+                  </TouchableOpacity>
+                  
+                  <TouchableOpacity
+                    onPress={() => handleDelete(webhook)}
+                    style={[styles.actionButton, styles.deleteButton]}
+                  >
+                    <Ionicons name="trash-outline" size={16} color="#EF4444" />
+                  </TouchableOpacity>
+                </View>
+              </View>
+              
+              <Text style={styles.webhookUrl}>{webhook.url}</Text>
+              <Text style={styles.webhookMeta}>
+                {webhook.method} • Created {new Date(webhook.createdAt || Date.now()).toLocaleDateString()}
+              </Text>
+              
+              {testResults[webhook.id] && (
+                <View style={[
+                  styles.testResult,
+                  testResults[webhook.id].testing 
+                    ? styles.testResultTesting
+                    : testResults[webhook.id].success 
+                      ? styles.testResultSuccess 
+                      : styles.testResultError
+                ]}>
+                  <Text style={styles.testResultText}>
                     {testResults[webhook.id].testing 
                       ? 'Testing webhook...' 
                       : testResults[webhook.id].success 
                         ? `✓ Test successful (${testResults[webhook.id].status})` 
                         : `✗ Test failed: ${testResults[webhook.id].error}`
                     }
-                  </div>
-                )}
-              </div>
-              
-              <div className="flex space-x-2">
-                <button
-                  onClick={() => handleTest(webhook)}
-                  disabled={testResults[webhook.id]?.testing}
-                  className="text-blue-400 hover:text-blue-300 p-1 disabled:opacity-50"
-                  title="Test Webhook"
-                >
-                  <Check className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={() => handleEdit(webhook)}
-                  className="text-gray-400 hover:text-gray-300 p-1"
-                  title="Edit Webhook"
-                >
-                  <SettingsIcon className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={() => deleteWebhook(webhook.id)}
-                  className="text-red-400 hover:text-red-300 p-1"
-                  title="Delete Webhook"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-          </div>
-        ))}
-        
-        {webhooks.length === 0 && (
-          <div className="text-center py-8 text-gray-400">
-            <Webhook className="w-12 h-12 mx-auto mb-3 opacity-50" />
-            <p>No webhooks configured yet</p>
-            <p className="text-sm">Add your first webhook to get started</p>
-          </div>
-        )}
-      </div>
-    </div>
-  )};
+                  </Text>
+                </View>
+              )}
+            </View>
+          ))}
+          
+          {webhooks.length === 0 && (
+            <View style={styles.emptyState}>
+              <Ionicons name="link-outline" size={48} color="#6B7280" />
+              <Text style={styles.emptyStateTitle}>No webhooks configured</Text>
+              <Text style={styles.emptyStateSubtitle}>
+                Add your first webhook to get started
+              </Text>
+            </View>
+          )}
+        </View>
+      </ScrollView>
+
+      {/* Add/Edit Webhook Modal */}
+      <Modal
+        visible={isAdding}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={resetForm}
+      >
+        <SafeAreaView style={styles.modalContainer}>
+          <StatusBar barStyle="light-content" backgroundColor="#0D0D0D" />
+          
+          {/* Modal Header */}
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>
+              {editingId ? 'Edit Webhook' : 'Add New Webhook'}
+            </Text>
+            <TouchableOpacity onPress={resetForm} style={styles.closeButton}>
+              <Ionicons name="close" size={22} color="#9CA3AF" />
+            </TouchableOpacity>
+          </View>
+
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={styles.modalKeyboardView}
+          >
+            <ScrollView style={styles.modalContent} showsVerticalScrollIndicator={false}>
+              {/* Name Input */}
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Name *</Text>
+                <View style={styles.inputContainer}>
+                  <TextInput
+                    style={styles.textInput}
+                    value={formData.name}
+                    onChangeText={(text) => setFormData({...formData, name: text})}
+                    placeholder="My Webhook"
+                    placeholderTextColor="#6B7280"
+                    autoCapitalize="words"
+                  />
+                </View>
+              </View>
+
+              {/* URL Input */}
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>URL *</Text>
+                <View style={styles.inputContainer}>
+                  <TextInput
+                    style={styles.textInput}
+                    value={formData.url}
+                    onChangeText={(text) => setFormData({...formData, url: text})}
+                    placeholder="https://your-webhook-url.com/endpoint"
+                    placeholderTextColor="#6B7280"
+                    keyboardType="url"
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                  />
+                </View>
+              </View>
+
+              {/* Method and Active Toggle */}
+              <View style={styles.rowContainer}>
+                <View style={styles.methodContainer}>
+                  <Text style={styles.inputLabel}>Method</Text>
+                  <TouchableOpacity onPress={selectMethod} style={styles.methodSelector}>
+                    <Text style={styles.methodText}>{formData.method}</Text>
+                    <Ionicons name="chevron-down" size={16} color="#9CA3AF" />
+                  </TouchableOpacity>
+                </View>
+                
+                <View style={styles.toggleContainer}>
+                  <Text style={styles.inputLabel}>Active</Text>
+                  <Switch
+                    value={formData.active}
+                    onValueChange={(value) => setFormData({...formData, active: value})}
+                    trackColor={{ false: '#374151', true: '#FF6B35' }}
+                    thumbColor={formData.active ? '#ffffff' : '#f4f4f5'}
+                    ios_backgroundColor="#374151"
+                  />
+                </View>
+              </View>
+
+              {/* Headers Input */}
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Headers (JSON)</Text>
+                <View style={styles.textAreaContainer}>
+                  <TextInput
+                    style={styles.textArea}
+                    value={formData.headers}
+                    onChangeText={(text) => setFormData({...formData, headers: text})}
+                    placeholder='{"Authorization": "Bearer your-token"}'
+                    placeholderTextColor="#6B7280"
+                    multiline
+                    numberOfLines={3}
+                    textAlignVertical="top"
+                  />
+                </View>
+              </View>
+
+              {/* Body Template Input */}
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Body Template (JSON)</Text>
+                <View style={styles.textAreaContainer}>
+                  <TextInput
+                    style={styles.textArea}
+                    value={formData.body}
+                    onChangeText={(text) => setFormData({...formData, body: text})}
+                    multiline
+                    numberOfLines={4}
+                    textAlignVertical="top"
+                  />
+                </View>
+                <Text style={styles.helperText}>
+                  Use {"{{message}}"} for message content, {"{{user}}"} for username, {"{{timestamp}}"} for timestamp
+                </Text>
+              </View>
+
+              {/* Action Buttons */}
+              <View style={styles.modalActions}>
+                <TouchableOpacity onPress={handleSubmit} style={styles.submitButton}>
+                  <Text style={styles.submitButtonText}>
+                    {editingId ? 'Update' : 'Create'} Webhook
+                  </Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity onPress={resetForm} style={styles.cancelButton}>
+                  <Text style={styles.cancelButtonText}>Cancel</Text>
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
+          </KeyboardAvoidingView>
+        </SafeAreaView>
+      </Modal>
+    </SafeAreaView>
+  );
+};
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#0D0D0D',
+  },
+  header: {
+    backgroundColor: '#151515',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#262626',
+  },
+  headerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  closeButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#1F1F1F',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#2A2A2A',
+  },
+  content: {
+    flex: 1,
+    paddingHorizontal: 20,
+  },
+  addButtonContainer: {
+    paddingVertical: 20,
+  },
+  addButton: {
+    backgroundColor: '#FF6B35',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    borderRadius: 12,
+    gap: 8,
+  },
+  addButtonText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  webhooksList: {
+    paddingBottom: 20,
+  },
+  webhookCard: {
+    backgroundColor: '#1F1F1F',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#2A2A2A',
+  },
+  webhookHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  webhookInfo: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  webhookName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  statusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  statusActive: {
+    backgroundColor: 'rgba(34, 197, 94, 0.2)',
+  },
+  statusInactive: {
+    backgroundColor: 'rgba(107, 114, 128, 0.2)',
+  },
+  statusText: {
+    fontSize: 10,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+  },
+  statusTextActive: {
+    color: '#22C55E',
+  },
+  statusTextInactive: {
+    color: '#6B7280',
+  },
+  webhookActions: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  actionButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#151515',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#2A2A2A',
+  },
+  testButton: {},
+  editButton: {},
+  deleteButton: {},
+  webhookUrl: {
+    fontSize: 14,
+    color: '#9CA3AF',
+    marginBottom: 4,
+  },
+  webhookMeta: {
+    fontSize: 12,
+    color: '#6B7280',
+  },
+  testResult: {
+    marginTop: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  testResultTesting: {
+    backgroundColor: 'rgba(245, 158, 11, 0.2)',
+  },
+  testResultSuccess: {
+    backgroundColor: 'rgba(34, 197, 94, 0.2)',
+  },
+  testResultError: {
+    backgroundColor: 'rgba(239, 68, 68, 0.2)',
+  },
+  testResultText: {
+    fontSize: 12,
+    color: '#E5E7EB',
+  },
+  emptyState: {
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  emptyStateTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#9CA3AF',
+    marginTop: 16,
+    marginBottom: 4,
+  },
+  emptyStateSubtitle: {
+    fontSize: 14,
+    color: '#6B7280',
+    textAlign: 'center',
+  },
+  // Modal Styles
+  modalContainer: {
+    flex: 1,
+    backgroundColor: '#0D0D0D',
+  },
+  modalHeader: {
+    backgroundColor: '#151515',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#262626',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  modalKeyboardView: {
+    flex: 1,
+  },
+  modalContent: {
+    flex: 1,
+    paddingHorizontal: 20,
+    paddingTop: 20,
+  },
+  inputGroup: {
+    marginBottom: 20,
+  },
+  inputLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#E5E7EB',
+    marginBottom: 8,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  inputContainer: {
+    backgroundColor: '#1F1F1F',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#2A2A2A',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
+  textInput: {
+    fontSize: 15,
+    color: '#FFFFFF',
+    fontWeight: '400',
+  },
+  rowContainer: {
+    flexDirection: 'row',
+    gap: 16,
+    marginBottom: 20,
+  },
+  methodContainer: {
+    flex: 1,
+  },
+  methodSelector: {
+    backgroundColor: '#1F1F1F',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#2A2A2A',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  methodText: {
+    fontSize: 15,
+    color: '#FFFFFF',
+    fontWeight: '400',
+  },
+  toggleContainer: {
+    alignItems: 'center',
+    paddingTop: 8,
+  },
+  textAreaContainer: {
+    backgroundColor: '#1F1F1F',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#2A2A2A',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
+  textArea: {
+    fontSize: 13,
+    color: '#FFFFFF',
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    textAlignVertical: 'top',
+    minHeight: 60,
+  },
+  helperText: {
+    fontSize: 11,
+    color: '#6B7280',
+    marginTop: 6,
+    lineHeight: 16,
+  },
+  modalActions: {
+    paddingVertical: 20,
+    gap: 12,
+  },
+  submitButton: {
+    backgroundColor: '#FF6B35',
+    paddingVertical: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  submitButtonText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  cancelButton: {
+    backgroundColor: '#374151',
+    paddingVertical: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  cancelButtonText: {
+    color: '#9CA3AF',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+});
+
+export default WebhookSetupScreen;

@@ -13,6 +13,7 @@ import {
   Animated,
   Dimensions,
   StatusBar,
+  SafeAreaView,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -41,36 +42,21 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin = () => {} }) => {
   const [slideAnim] = useState(new Animated.Value(0));
   const [logoAnim] = useState(new Animated.Value(0));
   const [formAnim] = useState(new Animated.Value(0));
-  const [glowAnim] = useState(new Animated.Value(0));
 
   // Initialize animations
   React.useEffect(() => {
     Animated.parallel([
       Animated.timing(logoAnim, {
         toValue: 1,
-        duration: 1000,
+        duration: 800,
         useNativeDriver: true,
       }),
       Animated.timing(formAnim, {
         toValue: 1,
-        duration: 800,
-        delay: 300,
+        duration: 600,
+        delay: 200,
         useNativeDriver: true,
       }),
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(glowAnim, {
-            toValue: 1,
-            duration: 2000,
-            useNativeDriver: true,
-          }),
-          Animated.timing(glowAnim, {
-            toValue: 0,
-            duration: 2000,
-            useNativeDriver: true,
-          }),
-        ])
-      ),
     ]).start();
   }, []);
 
@@ -78,7 +64,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin = () => {} }) => {
   React.useEffect(() => {
     Animated.spring(slideAnim, {
       toValue: isSignUp ? 1 : 0,
-      tension: 100,
+      tension: 80,
       friction: 8,
       useNativeDriver: false,
     }).start();
@@ -168,459 +154,331 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin = () => {} }) => {
     setShowConfirmPassword(false);
   };
 
-  const FloatingParticle = ({ delay = 0 }) => {
-    const [particleAnim] = useState(new Animated.Value(0));
-
-    React.useEffect(() => {
-      Animated.loop(
-        Animated.sequence([
-          Animated.delay(delay),
-          Animated.timing(particleAnim, {
-            toValue: 1,
-            duration: 3000 + Math.random() * 2000,
-            useNativeDriver: true,
-          }),
-          Animated.timing(particleAnim, {
-            toValue: 0,
-            duration: 3000 + Math.random() * 2000,
-            useNativeDriver: true,
-          }),
-        ])
-      ).start();
-    }, [delay]);
-
-    return (
-      <Animated.View
-        style={[
-          styles.floatingParticle,
-          {
-            opacity: particleAnim.interpolate({
-              inputRange: [0, 1],
-              outputRange: [0.1, 0.6],
-            }),
-            transform: [
-              {
-                translateY: particleAnim.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [0, -50],
-                }),
-              },
-              {
-                translateX: particleAnim.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [0, Math.sin(delay) * 30],
-                }),
-              },
-            ],
-          },
-        ]}
-      />
-    );
-  };
-
   return (
-    <View style={styles.container}>
-      <LinearGradient
-        colors={['#0a0a0f', '#1a1a2e', '#16213e', '#0f1419']}
-        style={styles.backgroundGradient}
+    <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="light-content" backgroundColor="#0D0D0D" translucent />
+      
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.keyboardAvoidingView}
       >
-        <StatusBar barStyle="light-content" backgroundColor="#0a0a0f" translucent />
-        
-        {/* Floating Particles Background */}
-        {Array.from({ length: 8 }).map((_, index) => (
-          <FloatingParticle key={index} delay={index * 500} />
-        ))}
-
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.keyboardAvoidingView}
+        <ScrollView
+          contentContainerStyle={styles.scrollContainer}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
         >
-          <ScrollView
-            contentContainerStyle={styles.scrollContainer}
-            keyboardShouldPersistTaps="handled"
-            showsVerticalScrollIndicator={false}
-          >
-            {/* Logo Section */}
-            <Animated.View style={[
-              styles.logoContainer,
-              {
-                opacity: logoAnim,
-                transform: [
-                  {
-                    translateY: logoAnim.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [50, 0],
-                    }),
-                  },
-                  {
-                    scale: logoAnim.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [0.8, 1],
-                    }),
-                  },
-                ],
-              },
-            ]}>
-              <Animated.View style={[
-                styles.logoBackground,
+          {/* Logo Section */}
+          <Animated.View style={[
+            styles.logoContainer,
+            {
+              opacity: logoAnim,
+              transform: [
                 {
-                  shadowOpacity: glowAnim.interpolate({
+                  translateY: logoAnim.interpolate({
                     inputRange: [0, 1],
-                    outputRange: [0.4, 0.8],
+                    outputRange: [30, 0],
                   }),
-                }
-              ]}>
-                <LinearGradient
-                  colors={['#667eea', '#764ba2', '#f093fb']}
-                  style={styles.logoGradient}
-                >
-                  <Ionicons name="sparkles" size={40} color="white" />
-                </LinearGradient>
-              </Animated.View>
-              <Animated.View style={{
-                transform: [{
-                  translateY: slideAnim.interpolate({
+                },
+                {
+                  scale: logoAnim.interpolate({
                     inputRange: [0, 1],
-                    outputRange: [0, -8],
-                  })
-                }]
-              }}>
-                <Text style={styles.welcomeTitle}>
-                  {isSignUp ? 'Join Neural AI' : 'Welcome Back'}
-                </Text>
-                <Text style={styles.welcomeSubtitle}>
-                  {isSignUp 
-                    ? 'Create your account and unlock AI potential' 
-                    : 'Sign in to continue your AI journey'
-                  }
-                </Text>
-              </Animated.View>
+                    outputRange: [0.8, 1],
+                  }),
+                },
+              ],
+            },
+          ]}>
+            <View style={styles.logoBackground}>
+              <Ionicons name="sparkles" size={32} color="#FF6B35" />
+            </View>
+            <Animated.View style={{
+              transform: [{
+                translateY: slideAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0, -4],
+                })
+              }]
+            }}>
+              <Text style={styles.welcomeTitle}>
+                {isSignUp ? 'Join Neural AI' : 'Welcome Back'}
+              </Text>
+              <Text style={styles.welcomeSubtitle}>
+                {isSignUp 
+                  ? 'Create your account and unlock AI potential' 
+                  : 'Sign in to continue your AI journey'
+                }
+              </Text>
             </Animated.View>
+          </Animated.View>
 
-            {/* Form Section */}
-            <Animated.View style={[
-              styles.formContainer,
-              {
-                opacity: formAnim,
-                transform: [
-                  {
-                    translateY: formAnim.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [30, 0],
-                    }),
-                  },
-                ],
-              },
-            ]}>
-              <LinearGradient
-                colors={['rgba(255,255,255,0.05)', 'rgba(255,255,255,0.02)']}
-                style={styles.formGradient}
-              >
-                {/* Name Input (Sign Up only) */}
-                {isSignUp && (
-                  <Animated.View 
-                    style={[
-                      styles.inputGroup,
-                      {
-                        opacity: slideAnim,
-                        height: slideAnim.interpolate({
-                          inputRange: [0, 1],
-                          outputRange: [0, 90],
-                        }),
-                        marginBottom: slideAnim.interpolate({
-                          inputRange: [0, 1],
-                          outputRange: [0, 20],
-                        }),
-                      }
-                    ]}
-                  >
-                    <Text style={styles.inputLabel}>Full Name</Text>
-                    <LinearGradient
-                      colors={name ? 
-                        ['rgba(102, 126, 234, 0.1)', 'rgba(118, 75, 162, 0.1)'] : 
-                        ['rgba(255,255,255,0.05)', 'rgba(255,255,255,0.02)']
-                      }
-                      style={[styles.inputContainer, name && styles.inputContainerFocused]}
-                    >
-                      <Ionicons
-                        name="person-outline"
-                        size={22}
-                        color={name ? "#667eea" : "#6b7280"}
-                        style={styles.inputIcon}
-                      />
-                      <TextInput
-                        style={styles.textInput}
-                        value={name}
-                        onChangeText={setName}
-                        placeholder="Enter your full name"
-                        placeholderTextColor="#4b5563"
-                        autoCapitalize="words"
-                        autoCorrect={false}
-                        editable={!isLoading}
-                      />
-                    </LinearGradient>
-                  </Animated.View>
-                )}
-
-                {/* Email Input */}
-                <View style={styles.inputGroup}>
-                  <Text style={styles.inputLabel}>Email Address</Text>
-                  <LinearGradient
-                    colors={email ? 
-                      ['rgba(102, 126, 234, 0.1)', 'rgba(118, 75, 162, 0.1)'] : 
-                      ['rgba(255,255,255,0.05)', 'rgba(255,255,255,0.02)']
+          {/* Form Section */}
+          <Animated.View style={[
+            styles.formContainer,
+            {
+              opacity: formAnim,
+              transform: [
+                {
+                  translateY: formAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [20, 0],
+                  }),
+                },
+              ],
+            },
+          ]}>
+            <View style={styles.formContent}>
+              {/* Name Input (Sign Up only) */}
+              {isSignUp && (
+                <Animated.View 
+                  style={[
+                    styles.inputGroup,
+                    {
+                      opacity: slideAnim,
+                      height: slideAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [0, 78],
+                      }),
+                      marginBottom: slideAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [0, 16],
+                      }),
                     }
-                    style={[styles.inputContainer, email && styles.inputContainerFocused]}
-                  >
+                  ]}
+                >
+                  <Text style={styles.inputLabel}>Full Name</Text>
+                  <View style={[
+                    styles.inputContainer,
+                    name && styles.inputContainerFocused
+                  ]}>
                     <Ionicons
-                      name="mail-outline"
-                      size={22}
-                      color={email ? "#667eea" : "#6b7280"}
+                      name="person-outline"
+                      size={20}
+                      color={name ? "#FF6B35" : "#6B7280"}
                       style={styles.inputIcon}
                     />
                     <TextInput
                       style={styles.textInput}
-                      value={email}
-                      onChangeText={setEmail}
-                      placeholder="Enter your email"
-                      placeholderTextColor="#4b5563"
-                      keyboardType="email-address"
-                      autoCapitalize="none"
+                      value={name}
+                      onChangeText={setName}
+                      placeholder="Enter your full name"
+                      placeholderTextColor="#6B7280"
+                      autoCapitalize="words"
                       autoCorrect={false}
                       editable={!isLoading}
                     />
-                  </LinearGradient>
-                </View>
+                  </View>
+                </Animated.View>
+              )}
 
-                {/* Password Input */}
-                <View style={styles.inputGroup}>
-                  <Text style={styles.inputLabel}>Password</Text>
-                  <LinearGradient
-                    colors={password ? 
-                      ['rgba(102, 126, 234, 0.1)', 'rgba(118, 75, 162, 0.1)'] : 
-                      ['rgba(255,255,255,0.05)', 'rgba(255,255,255,0.02)']
-                    }
-                    style={[styles.inputContainer, password && styles.inputContainerFocused]}
+              {/* Email Input */}
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Email Address</Text>
+                <View style={[
+                  styles.inputContainer,
+                  email && styles.inputContainerFocused
+                ]}>
+                  <Ionicons
+                    name="mail-outline"
+                    size={20}
+                    color={email ? "#FF6B35" : "#6B7280"}
+                    style={styles.inputIcon}
+                  />
+                  <TextInput
+                    style={styles.textInput}
+                    value={email}
+                    onChangeText={setEmail}
+                    placeholder="Enter your email"
+                    placeholderTextColor="#6B7280"
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    editable={!isLoading}
+                  />
+                </View>
+              </View>
+
+              {/* Password Input */}
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Password</Text>
+                <View style={[
+                  styles.inputContainer,
+                  password && styles.inputContainerFocused
+                ]}>
+                  <Ionicons
+                    name="lock-closed-outline"
+                    size={20}
+                    color={password ? "#FF6B35" : "#6B7280"}
+                    style={styles.inputIcon}
+                  />
+                  <TextInput
+                    style={[styles.textInput, styles.passwordInput]}
+                    value={password}
+                    onChangeText={setPassword}
+                    placeholder="Enter your password"
+                    placeholderTextColor="#6B7280"
+                    secureTextEntry={!showPassword}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    editable={!isLoading}
+                  />
+                  <TouchableOpacity
+                    style={styles.eyeIcon}
+                    onPress={() => setShowPassword(!showPassword)}
+                    disabled={isLoading}
                   >
                     <Ionicons
+                      name={showPassword ? "eye-off-outline" : "eye-outline"}
+                      size={20}
+                      color="#6B7280"
+                    />
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              {/* Confirm Password Input (Sign Up only) */}
+              {isSignUp && (
+                <Animated.View 
+                  style={[
+                    styles.inputGroup,
+                    {
+                      opacity: slideAnim,
+                      height: slideAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [0, 78],
+                      }),
+                    }
+                  ]}
+                >
+                  <Text style={styles.inputLabel}>Confirm Password</Text>
+                  <View style={[
+                    styles.inputContainer,
+                    confirmPassword && styles.inputContainerFocused
+                  ]}>
+                    <Ionicons
                       name="lock-closed-outline"
-                      size={22}
-                      color={password ? "#667eea" : "#6b7280"}
+                      size={20}
+                      color={confirmPassword ? "#FF6B35" : "#6B7280"}
                       style={styles.inputIcon}
                     />
                     <TextInput
                       style={[styles.textInput, styles.passwordInput]}
-                      value={password}
-                      onChangeText={setPassword}
-                      placeholder="Enter your password"
-                      placeholderTextColor="#4b5563"
-                      secureTextEntry={!showPassword}
+                      value={confirmPassword}
+                      onChangeText={setConfirmPassword}
+                      placeholder="Confirm your password"
+                      placeholderTextColor="#6B7280"
+                      secureTextEntry={!showConfirmPassword}
                       autoCapitalize="none"
                       autoCorrect={false}
                       editable={!isLoading}
                     />
                     <TouchableOpacity
                       style={styles.eyeIcon}
-                      onPress={() => setShowPassword(!showPassword)}
+                      onPress={() => setShowConfirmPassword(!showConfirmPassword)}
                       disabled={isLoading}
                     >
                       <Ionicons
-                        name={showPassword ? "eye-off-outline" : "eye-outline"}
-                        size={22}
-                        color="#6b7280"
+                        name={showConfirmPassword ? "eye-off-outline" : "eye-outline"}
+                        size={20}
+                        color="#6B7280"
                       />
                     </TouchableOpacity>
-                  </LinearGradient>
-                </View>
+                  </View>
+                </Animated.View>
+              )}
 
-                {/* Confirm Password Input (Sign Up only) */}
-                {isSignUp && (
-                  <Animated.View 
-                    style={[
-                      styles.inputGroup,
-                      {
-                        opacity: slideAnim,
-                        height: slideAnim.interpolate({
-                          inputRange: [0, 1],
-                          outputRange: [0, 90],
-                        }),
-                      }
-                    ]}
-                  >
-                    <Text style={styles.inputLabel}>Confirm Password</Text>
-                    <LinearGradient
-                      colors={confirmPassword ? 
-                        ['rgba(102, 126, 234, 0.1)', 'rgba(118, 75, 162, 0.1)'] : 
-                        ['rgba(255,255,255,0.05)', 'rgba(255,255,255,0.02)']
-                      }
-                      style={[styles.inputContainer, confirmPassword && styles.inputContainerFocused]}
-                    >
-                      <Ionicons
-                        name="lock-closed-outline"
-                        size={22}
-                        color={confirmPassword ? "#667eea" : "#6b7280"}
-                        style={styles.inputIcon}
-                      />
-                      <TextInput
-                        style={[styles.textInput, styles.passwordInput]}
-                        value={confirmPassword}
-                        onChangeText={setConfirmPassword}
-                        placeholder="Confirm your password"
-                        placeholderTextColor="#4b5563"
-                        secureTextEntry={!showConfirmPassword}
-                        autoCapitalize="none"
-                        autoCorrect={false}
-                        editable={!isLoading}
-                      />
-                      <TouchableOpacity
-                        style={styles.eyeIcon}
-                        onPress={() => setShowConfirmPassword(!showConfirmPassword)}
-                        disabled={isLoading}
-                      >
-                        <Ionicons
-                          name={showConfirmPassword ? "eye-off-outline" : "eye-outline"}
-                          size={22}
-                          color="#6b7280"
-                        />
-                      </TouchableOpacity>
-                    </LinearGradient>
-                  </Animated.View>
-                )}
-
-                {/* Submit Button */}
-                <TouchableOpacity
-                  style={styles.submitButton}
-                  onPress={handleSubmit}
-                  disabled={isLoading || !email || !password}
-                  activeOpacity={0.8}
-                >
-                  <LinearGradient
-                    colors={
-                      (isLoading || !email || !password)
-                        ? ['rgba(75, 85, 99, 0.5)', 'rgba(55, 65, 81, 0.5)']
-                        : ['#667eea', '#764ba2', '#f093fb']
-                    }
-                    style={styles.submitButtonGradient}
-                  >
-                    {isLoading ? (
-                      <View style={styles.loadingContainer}>
-                        <ActivityIndicator size="small" color="white" />
-                        <Text style={styles.submitButtonText}>
-                          {isSignUp ? 'Creating Account...' : 'Signing In...'}
-                        </Text>
-                      </View>
-                    ) : (
+              {/* Submit Button */}
+              <TouchableOpacity
+                style={[
+                  styles.submitButton,
+                  (isLoading || !email || !password) && styles.submitButtonDisabled
+                ]}
+                onPress={handleSubmit}
+                disabled={isLoading || !email || !password}
+                activeOpacity={0.8}
+              >
+                <View style={styles.submitButtonContent}>
+                  {isLoading ? (
+                    <View style={styles.loadingContainer}>
+                      <ActivityIndicator size="small" color="white" />
                       <Text style={styles.submitButtonText}>
-                        {isSignUp ? 'Create Account' : 'Sign In'}
+                        {isSignUp ? 'Creating Account...' : 'Signing In...'}
                       </Text>
-                    )}
-                  </LinearGradient>
-                </TouchableOpacity>
-
-                {/* Toggle Auth Mode */}
-                <View style={styles.toggleContainer}>
-                  <Text style={styles.toggleText}>
-                    {isSignUp ? 'Already have an account?' : "Don't have an account?"}
-                  </Text>
-                  <TouchableOpacity onPress={toggleAuthMode} disabled={isLoading}>
-                    <LinearGradient
-                      colors={['#667eea', '#764ba2']}
-                      style={styles.toggleLinkGradient}
-                    >
-                      <Text style={styles.toggleLink}>
-                        {isSignUp ? 'Sign In' : 'Sign Up'}
-                      </Text>
-                    </LinearGradient>
-                  </TouchableOpacity>
+                    </View>
+                  ) : (
+                    <Text style={styles.submitButtonText}>
+                      {isSignUp ? 'Create Account' : 'Sign In'}
+                    </Text>
+                  )}
                 </View>
-              </LinearGradient>
-            </Animated.View>
-
-            {/* Divider */}
-            <View style={styles.dividerContainer}>
-              <LinearGradient
-                colors={['transparent', 'rgba(255,255,255,0.2)', 'transparent']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.dividerLine}
-              />
-              <Text style={styles.dividerText}>or continue with</Text>
-              <LinearGradient
-                colors={['transparent', 'rgba(255,255,255,0.2)', 'transparent']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.dividerLine}
-              />
-            </View>
-
-            {/* OAuth Buttons */}
-            <View style={styles.oauthContainer}>
-              <TouchableOpacity
-                style={styles.oauthButton}
-                onPress={() => handleOAuthLogin('google')}
-                disabled={isLoading}
-                activeOpacity={0.8}
-              >
-                <LinearGradient
-                  colors={['#ea4335', '#d33b2c']}
-                  style={styles.oauthButtonGradient}
-                >
-                  <Ionicons name="logo-google" size={22} color="white" />
-                  <Text style={styles.oauthButtonText}>Google</Text>
-                </LinearGradient>
               </TouchableOpacity>
 
-              <TouchableOpacity
-                style={styles.oauthButton}
-                onPress={() => handleOAuthLogin('github')}
-                disabled={isLoading}
-                activeOpacity={0.8}
-              >
-                <LinearGradient
-                  colors={['#333333', '#1a1a1a']}
-                  style={styles.oauthButtonGradient}
-                >
-                  <Ionicons name="logo-github" size={22} color="white" />
-                  <Text style={styles.oauthButtonText}>GitHub</Text>
-                </LinearGradient>
-              </TouchableOpacity>
-            </View>
-
-            {/* Demo Message */}
-            <View style={styles.demoContainer}>
-              <LinearGradient
-                colors={['rgba(102, 126, 234, 0.1)', 'rgba(118, 75, 162, 0.1)']}
-                style={styles.demoBadge}
-              >
-                <Ionicons name="information-circle-outline" size={16} color="#667eea" />
-                <Text style={styles.demoText}>
-                  Demo mode: Use any credentials to {isSignUp ? 'create account' : 'sign in'}
+              {/* Toggle Auth Mode */}
+              <View style={styles.toggleContainer}>
+                <Text style={styles.toggleText}>
+                  {isSignUp ? 'Already have an account?' : "Don't have an account?"}
                 </Text>
-              </LinearGradient>
+                <TouchableOpacity onPress={toggleAuthMode} disabled={isLoading}>
+                  <Text style={styles.toggleLink}>
+                    {isSignUp ? 'Sign In' : 'Sign Up'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
             </View>
-          </ScrollView>
-        </KeyboardAvoidingView>
-      </LinearGradient>
-    </View>
+          </Animated.View>
+
+          {/* Divider */}
+          <View style={styles.dividerContainer}>
+            <View style={styles.dividerLine} />
+            <Text style={styles.dividerText}>or continue with</Text>
+            <View style={styles.dividerLine} />
+          </View>
+
+          {/* OAuth Buttons */}
+          <View style={styles.oauthContainer}>
+            <TouchableOpacity
+              style={styles.oauthButton}
+              onPress={() => handleOAuthLogin('google')}
+              disabled={isLoading}
+              activeOpacity={0.8}
+            >
+              <View style={[styles.oauthButtonContent, styles.googleButton]}>
+                <Ionicons name="logo-google" size={20} color="white" />
+                <Text style={styles.oauthButtonText}>Google</Text>
+              </View>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.oauthButton}
+              onPress={() => handleOAuthLogin('github')}
+              disabled={isLoading}
+              activeOpacity={0.8}
+            >
+              <View style={[styles.oauthButtonContent, styles.githubButton]}>
+                <Ionicons name="logo-github" size={20} color="white" />
+                <Text style={styles.oauthButtonText}>GitHub</Text>
+              </View>
+            </TouchableOpacity>
+          </View>
+
+          {/* Demo Message */}
+          <View style={styles.demoContainer}>
+            <View style={styles.demoBadge}>
+              <Ionicons name="information-circle-outline" size={16} color="#FF6B35" />
+              <Text style={styles.demoText}>
+                Demo mode: Use any credentials to {isSignUp ? 'create account' : 'sign in'}
+              </Text>
+            </View>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0a0a0f',
-  },
-  backgroundGradient: {
-    flex: 1,
-  },
-  floatingParticle: {
-    position: 'absolute',
-    width: 4,
-    height: 4,
-    backgroundColor: '#667eea',
-    borderRadius: 2,
-    top: Math.random() * screenHeight,
-    left: Math.random() * screenWidth,
+    backgroundColor: '#0D0D0D',
   },
   keyboardAvoidingView: {
     flex: 1,
@@ -629,190 +487,174 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     justifyContent: 'center',
     padding: 24,
-    paddingVertical: 60,
+    paddingVertical: 40,
   },
   logoContainer: {
     alignItems: 'center',
-    marginBottom: 48,
+    marginBottom: 40,
   },
   logoBackground: {
-    borderRadius: 30,
-    elevation: 20,
-    shadowColor: '#667eea',
-    shadowOffset: { width: 0, height: 12 },
-    shadowRadius: 24,
-    marginBottom: 32,
-  },
-  logoGradient: {
-    width: 120,
-    height: 120,
-    borderRadius: 30,
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#1F1F1F',
     justifyContent: 'center',
     alignItems: 'center',
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: '#2A2A2A',
   },
   welcomeTitle: {
-    fontSize: 34,
-    fontWeight: '900',
-    color: '#ffffff',
-    marginBottom: 12,
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    marginBottom: 8,
     textAlign: 'center',
-    letterSpacing: -1,
   },
   welcomeSubtitle: {
-    fontSize: 16,
-    color: '#a0a0a0',
+    fontSize: 15,
+    color: '#9CA3AF',
     textAlign: 'center',
-    lineHeight: 24,
+    lineHeight: 22,
     paddingHorizontal: 20,
   },
   formContainer: {
-    borderRadius: 28,
-    overflow: 'hidden',
     marginBottom: 32,
-    elevation: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.4,
-    shadowRadius: 20,
   },
-  formGradient: {
-    padding: 32,
+  formContent: {
+    backgroundColor: '#1F1F1F',
+    borderRadius: 20,
+    padding: 24,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
+    borderColor: '#2A2A2A',
   },
   inputGroup: {
-    marginBottom: 20,
+    marginBottom: 16,
   },
   inputLabel: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#ffffff',
-    marginBottom: 12,
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#E5E7EB',
+    marginBottom: 8,
     letterSpacing: 0.5,
     textTransform: 'uppercase',
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 18,
+    backgroundColor: '#151515',
+    borderRadius: 12,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-    paddingHorizontal: 20,
-    paddingVertical: 18,
+    borderColor: '#2A2A2A',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    height: 50,
   },
   inputContainerFocused: {
-    borderColor: '#667eea',
-    elevation: 8,
-    shadowColor: '#667eea',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
+    borderColor: '#FF6B35',
   },
   inputIcon: {
-    marginRight: 16,
+    marginRight: 12,
   },
   textInput: {
     flex: 1,
-    fontSize: 16,
-    color: '#ffffff',
-    fontWeight: '500',
+    fontSize: 15,
+    color: '#FFFFFF',
+    fontWeight: '400',
   },
   passwordInput: {
-    paddingRight: 50,
+    paddingRight: 40,
   },
   eyeIcon: {
     position: 'absolute',
-    right: 20,
-    padding: 8,
+    right: 16,
+    padding: 4,
   },
   submitButton: {
-    borderRadius: 18,
-    overflow: 'hidden',
-    marginTop: 12,
-    marginBottom: 24,
-    elevation: 12,
-    shadowColor: '#667eea',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.4,
-    shadowRadius: 16,
+    backgroundColor: '#FF6B35',
+    borderRadius: 12,
+    marginTop: 8,
+    marginBottom: 20,
   },
-  submitButtonGradient: {
-    paddingVertical: 20,
+  submitButtonDisabled: {
+    backgroundColor: '#374151',
+  },
+  submitButtonContent: {
+    paddingVertical: 16,
     alignItems: 'center',
     justifyContent: 'center',
   },
   submitButtonText: {
     color: 'white',
-    fontSize: 16,
-    fontWeight: '700',
-    letterSpacing: 0.5,
+    fontSize: 15,
+    fontWeight: '600',
   },
   loadingContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 8,
   },
   toggleContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
   },
   toggleText: {
     fontSize: 14,
-    color: '#a0a0a0',
-  },
-  toggleLinkGradient: {
-    paddingHorizontal: 2,
+    color: '#9CA3AF',
   },
   toggleLink: {
     fontSize: 14,
-    color: '#ffffff',
-    fontWeight: '700',
+    color: '#FF6B35',
+    fontWeight: '600',
   },
   dividerContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     marginVertical: 32,
-    gap: 20,
+    gap: 16,
   },
   dividerLine: {
     flex: 1,
     height: 1,
+    backgroundColor: '#2A2A2A',
   },
   dividerText: {
-    color: '#a0a0a0',
-    fontSize: 14,
-    fontWeight: '600',
-    letterSpacing: 0.5,
+    color: '#9CA3AF',
+    fontSize: 13,
+    fontWeight: '500',
     textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   oauthContainer: {
     flexDirection: 'row',
-    gap: 16,
+    gap: 12,
     marginBottom: 32,
   },
   oauthButton: {
     flex: 1,
-    borderRadius: 18,
-    overflow: 'hidden',
-    elevation: 8,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
+    borderRadius: 12,
   },
-  oauthButtonGradient: {
+  oauthButtonContent: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 18,
-    paddingHorizontal: 24,
-    gap: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    gap: 8,
+    borderRadius: 12,
+  },
+  googleButton: {
+    backgroundColor: '#DC2626',
+  },
+  githubButton: {
+    backgroundColor: '#1F2937',
   },
   oauthButtonText: {
     color: 'white',
-    fontSize: 15,
-    fontWeight: '700',
+    fontSize: 14,
+    fontWeight: '600',
   },
   demoContainer: {
     alignItems: 'center',
@@ -820,18 +662,19 @@ const styles = StyleSheet.create({
   demoBadge: {
     flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: 'rgba(255, 107, 53, 0.1)',
     borderWidth: 1,
-    borderColor: 'rgba(102, 126, 234, 0.3)',
-    borderRadius: 16,
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    gap: 10,
+    borderColor: 'rgba(255, 107, 53, 0.3)',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    gap: 8,
   },
   demoText: {
     fontSize: 12,
-    color: '#a0a0a0',
+    color: '#9CA3AF',
     textAlign: 'center',
-    fontWeight: '600',
+    fontWeight: '500',
   },
 });
 
