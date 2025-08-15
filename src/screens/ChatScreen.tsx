@@ -22,6 +22,7 @@ import { useChatContext } from '../contexts/ChatContext';
 import { useWebhookContext } from '../contexts/WebhookContext';
 import { useThemeContext } from '../contexts/ThemeContext';
 import SettingsScreen from './SettingsScreen';
+import { FileX } from 'lucide-react';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
