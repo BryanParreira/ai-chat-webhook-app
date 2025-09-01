@@ -14,15 +14,13 @@ import {
   StatusBar,
   SafeAreaView,
   Modal,
+  Alert,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 
 import { useChatContext } from '../contexts/ChatContext';
 import { useWebhookContext } from '../contexts/WebhookContext';
-import { useThemeContext } from '../contexts/ThemeContext';
 import SettingsScreen from './SettingsScreen';
-import { FileX } from 'lucide-react';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
@@ -36,39 +34,19 @@ interface ChatScreenProps {
   onLogout?: () => void;
 }
 
-// Enhanced typing indicator with premium dark styling
-const TypingIndicator: React.FC = () => {
+const TypingIndicator: React.FC<{ source?: 'ai' | 'webhook' }> = ({ source = 'ai' }) => {
   const [dot1] = useState(new Animated.Value(0));
   const [dot2] = useState(new Animated.Value(0));
   const [dot3] = useState(new Animated.Value(0));
   const [containerOpacity] = useState(new Animated.Value(0));
-  const [glowAnim] = useState(new Animated.Value(0));
 
   React.useEffect(() => {
-    Animated.parallel([
-      Animated.timing(containerOpacity, {
-        toValue: 1,
-        duration: 400,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
-      }),
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(glowAnim, {
-            toValue: 1,
-            duration: 1500,
-            easing: Easing.inOut(Easing.sin),
-            useNativeDriver: true,
-          }),
-          Animated.timing(glowAnim, {
-            toValue: 0,
-            duration: 1500,
-            easing: Easing.inOut(Easing.sin),
-            useNativeDriver: true,
-          }),
-        ])
-      ),
-    ]).start();
+    Animated.timing(containerOpacity, {
+      toValue: 1,
+      duration: 400,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
 
     const animate = (dot: Animated.Value, delay: number) => {
       Animated.loop(
@@ -100,15 +78,21 @@ const TypingIndicator: React.FC = () => {
       <View style={styles.typingBubble}>
         <View style={styles.typingContent}>
           <View style={styles.aiIndicator}>
-            <View style={styles.aiDot} />
+            <View style={[
+              styles.aiDot,
+              source === 'webhook' && styles.webhookDot
+            ]} />
           </View>
-          <Text style={styles.typingLabel}>AI is thinking</Text>
+          <Text style={styles.typingLabel}>
+            {source === 'webhook' ? 'Processing workflow...' : 'AI is thinking'}
+          </Text>
           <View style={styles.typingDots}>
             {[dot1, dot2, dot3].map((dot, index) => (
               <Animated.View
                 key={index}
                 style={[
                   styles.typingDot,
+                  source === 'webhook' && styles.webhookTypingDot,
                   {
                     transform: [
                       {
@@ -139,7 +123,6 @@ const TypingIndicator: React.FC = () => {
   );
 };
 
-// Enhanced message bubble with refined dark styling
 const MessageBubble: React.FC<{
   message: any;
   isUser: boolean;
@@ -176,6 +159,34 @@ const MessageBubble: React.FC<{
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
+  const getSourceIcon = () => {
+    if (isUser) return null;
+    
+    switch (message.source) {
+      case 'webhook':
+        return <Ionicons name="link" size={12} color="#3B82F6" />;
+      case 'n8n':
+        return <Ionicons name="flash" size={12} color="#3B82F6" />;
+      default:
+        return <Ionicons name="sparkles" size={12} color="#FF6B35" />;
+    }
+  };
+
+  const getSourceLabel = () => {
+    if (isUser || !message.source) return null;
+    
+    switch (message.source) {
+      case 'webhook':
+        return 'via webhook';
+      case 'n8n':
+        return 'via n8n';
+      case 'ai':
+        return 'AI';
+      default:
+        return message.source;
+    }
+  };
+
   return (
     <Animated.View
       style={[
@@ -192,21 +203,33 @@ const MessageBubble: React.FC<{
     >
       <View style={styles.messageBubbleContainer}>
         {!isUser && (
-          <View style={styles.botAvatar}>
-            <Ionicons name="sparkles" size={14} color="#FF6B35" />
+          <View style={[
+            styles.botAvatar,
+            message.source === 'webhook' && styles.webhookAvatar,
+            message.source === 'n8n' && styles.n8nAvatar
+          ]}>
+            {getSourceIcon()}
           </View>
         )}
         <View style={[
           styles.messageBubble,
-          isUser ? styles.userBubble : styles.botBubble
+          isUser ? styles.userBubble : styles.botBubble,
+          (message.source === 'webhook' || message.source === 'n8n') && styles.webhookBubble
         ]}>
           <Text style={isUser ? styles.userText : styles.botText}>
             {message.text}
           </Text>
           <View style={styles.messageFooter}>
-            <Text style={isUser ? styles.userTime : styles.botTime}>
-              {formatTime(message.timestamp)}
-            </Text>
+            <View style={styles.messageFooterLeft}>
+              <Text style={isUser ? styles.userTime : styles.botTime}>
+                {formatTime(message.timestamp)}
+              </Text>
+              {!isUser && getSourceLabel() && (
+                <Text style={styles.sourceLabel}>
+                  {getSourceLabel()}
+                </Text>
+              )}
+            </View>
             {isUser && (
               <Ionicons 
                 name="checkmark-done" 
@@ -227,9 +250,37 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ user, onLogout = () => {} }) =>
   const [inputHeight, setInputHeight] = useState(44);
   const [isInputFocused, setIsInputFocused] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [webhookTyping, setWebhookTyping] = useState(false);
+  
   const { messages, addMessage, isTyping, setIsTyping } = useChatContext();
-  const { triggerWebhooks } = useWebhookContext();
+  const { triggerWebhooks, webhooks } = useWebhookContext();
   const scrollViewRef = useRef<ScrollView>(null);
+
+  const processWebhookResponse = (responseData: any): string => {
+    if (!responseData) return '';
+    
+    if (typeof responseData === 'string') {
+      return responseData.trim();
+    }
+    
+    // Check common response fields
+    if (responseData.message) return responseData.message;
+    if (responseData.text) return responseData.text;
+    if (responseData.response) return responseData.response;
+    if (responseData.content) return responseData.content;
+    if (responseData.reply) return responseData.reply;
+    
+    // If it's an object, try to stringify it nicely
+    if (typeof responseData === 'object') {
+      try {
+        return JSON.stringify(responseData, null, 2);
+      } catch {
+        return String(responseData);
+      }
+    }
+    
+    return String(responseData);
+  };
 
   const sendMessage = async () => {
     if (!input.trim()) return;
@@ -243,42 +294,102 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ user, onLogout = () => {} }) =>
     addMessage(userMessage);
     
     const messageToRespond = input.trim();
+    const messageId = `msg-${Date.now()}`;
     setInput('');
     setInputHeight(44);
-    setIsTyping(true);
 
-    // Trigger webhooks with the enhanced context
-    try {
-      await triggerWebhooks(messageToRespond, user.name);
-    } catch (error) {
-      console.error('Failed to trigger webhooks:', error);
+    const activeWebhooks = webhooks.filter(w => w.active);
+    const hasWebhooks = activeWebhooks.length > 0;
+
+    if (hasWebhooks) {
+      setWebhookTyping(true);
+
+      try {
+        console.log(`Triggering ${activeWebhooks.length} active webhooks...`);
+        
+        // Trigger webhooks and get responses
+        const webhookResponses = await triggerWebhooks(
+          messageToRespond, 
+          user.name, 
+          'general',
+          messageId
+        );
+
+        console.log('Webhook responses:', webhookResponses);
+
+        // Process successful webhook responses
+        let hasValidResponse = false;
+        
+        webhookResponses.forEach((response, index) => {
+          if (response.success && response.responseData) {
+            const messageText = processWebhookResponse(response.responseData);
+            
+            if (messageText && messageText.trim()) {
+              const webhook = activeWebhooks[index];
+              const source = webhook.name.toLowerCase().includes('n8n') || 
+                           webhook.url.includes('n8n') ? 'n8n' : 'webhook';
+              
+              console.log(`Adding webhook response from ${webhook.name}:`, messageText);
+              
+              addMessage({
+                text: messageText,
+                sender: 'bot',
+                source: source,
+                webhookId: webhook.id,
+              });
+              
+              hasValidResponse = true;
+            }
+          } else if (!response.success) {
+            console.error(`Webhook failed:`, response.error);
+          }
+        });
+
+        if (!hasValidResponse) {
+          console.log('No valid webhook responses, showing fallback message');
+          addMessage({
+            text: "I received your message and sent it to the configured workflows, but didn't get a response back. The workflows might be processing in the background.",
+            sender: 'bot',
+            source: 'ai',
+          });
+        }
+
+      } catch (error) {
+        console.error('Failed to trigger webhooks:', error);
+        addMessage({
+          text: "There was an error sending your message to the configured workflows. Please check your webhook settings.",
+          sender: 'bot',
+          source: 'ai',
+        });
+      } finally {
+        setWebhookTyping(false);
+      }
+    } else {
+      // Fallback to AI response if no webhooks
+      setIsTyping(true);
+      
+      setTimeout(() => {
+        const responses = [
+          `I understand you mentioned: "${messageToRespond}". Let me help you with that!`,
+          `That's interesting! Regarding "${messageToRespond}", here's what I think...`,
+          `Great question about "${messageToRespond}"! Let me break this down for you.`,
+          `Thanks for sharing that. About "${messageToRespond}" - I have some insights to share.`,
+        ];
+        
+        const randomResponse = responses[Math.floor(Math.random() * responses.length)];
+        
+        addMessage({
+          text: randomResponse,
+          sender: 'bot',
+          source: 'ai',
+        });
+        setIsTyping(false);
+      }, 1500);
     }
 
     setTimeout(() => {
       scrollViewRef.current?.scrollToEnd({ animated: true });
     }, 100);
-
-    const responseDelay = 1200 + Math.random() * 2000;
-    setTimeout(() => {
-      const responses = [
-        `I understand you mentioned: "${messageToRespond}". Let me help you with that!`,
-        `That's fascinating! Regarding "${messageToRespond}", here's what I think...`,
-        `Great question about "${messageToRespond}"! Let me break this down for you.`,
-        `Thanks for sharing that. About "${messageToRespond}" - I have some insights to share.`,
-      ];
-      
-      const randomResponse = responses[Math.floor(Math.random() * responses.length)];
-      
-      addMessage({
-        text: randomResponse,
-        sender: 'bot',
-      });
-      setIsTyping(false);
-      
-      setTimeout(() => {
-        scrollViewRef.current?.scrollToEnd({ animated: true });
-      }, 100);
-    }, responseDelay);
   };
 
   useEffect(() => {
@@ -292,6 +403,21 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ user, onLogout = () => {} }) =>
   const handleContentSizeChange = (event: any) => {
     const { height } = event.nativeEvent.contentSize;
     setInputHeight(Math.max(44, Math.min(120, height)));
+  };
+
+  const showWebhookInfo = () => {
+    const activeCount = webhooks.filter(w => w.active).length;
+    
+    Alert.alert(
+      'Webhook Status',
+      activeCount > 0 
+        ? `${activeCount} webhook${activeCount !== 1 ? 's' : ''} active. Your messages will trigger workflows and responses will appear in chat.`
+        : 'No active webhooks. Messages will be handled by AI only.',
+      [
+        { text: 'Settings', onPress: () => setShowSettings(true) },
+        { text: 'OK' }
+      ]
+    );
   };
 
   return (
@@ -311,11 +437,21 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ user, onLogout = () => {} }) =>
                 <View style={styles.headerStatusContainer}>
                   <View style={[
                     styles.statusDot, 
-                    isTyping && styles.statusDotTyping
+                    (isTyping || webhookTyping) && styles.statusDotTyping,
+                    webhookTyping && styles.statusDotWebhook
                   ]} />
                   <Text style={styles.headerSubtitle}>
-                    {isTyping ? 'Processing...' : 'Online'}
+                    {webhookTyping ? 'Processing workflow...' : 
+                     isTyping ? 'Thinking...' : 'Online'}
                   </Text>
+                  {webhooks.filter(w => w.active).length > 0 && (
+                    <TouchableOpacity 
+                      style={styles.webhookIndicator}
+                      onPress={showWebhookInfo}
+                    >
+                      <Ionicons name="link" size={12} color="#3B82F6" />
+                    </TouchableOpacity>
+                  )}
                 </View>
               </View>
             </View>
@@ -349,7 +485,10 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ user, onLogout = () => {} }) =>
                 </View>
                 <Text style={styles.emptyStateTitle}>Welcome to Neural AI</Text>
                 <Text style={styles.emptyStateSubtitle}>
-                  Start a conversation and experience the power of AI assistance
+                  {webhooks.filter(w => w.active).length > 0
+                    ? 'Your messages will trigger automated workflows and receive instant responses'
+                    : 'Start a conversation and experience the power of AI assistance'
+                  }
                 </Text>
                 <View style={styles.suggestionChips}>
                   {['Ask a question', 'Get help with coding', 'Creative writing'].map((suggestion, index) => (
@@ -373,7 +512,9 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ user, onLogout = () => {} }) =>
               />
             ))}
             
-            {isTyping && <TypingIndicator />}
+            {(isTyping || webhookTyping) && (
+              <TypingIndicator source={webhookTyping ? 'webhook' : 'ai'} />
+            )}
             
             <View style={{ height: 24 }} />
           </ScrollView>
@@ -407,17 +548,17 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ user, onLogout = () => {} }) =>
                 
                 <TouchableOpacity
                   onPress={sendMessage}
-                  disabled={!input.trim() || isTyping}
+                  disabled={!input.trim() || isTyping || webhookTyping}
                   activeOpacity={0.8}
                   style={[
                     styles.sendButton,
-                    (input.trim() && !isTyping) && styles.sendButtonActive
+                    (input.trim() && !isTyping && !webhookTyping) && styles.sendButtonActive
                   ]}
                 >
                   <Ionicons 
-                    name={isTyping ? "hourglass" : "send"} 
+                    name={isTyping || webhookTyping ? "hourglass" : "send"} 
                     size={18} 
-                    color={input.trim() && !isTyping ? "#FFFFFF" : "#6B7280"}
+                    color={input.trim() && !isTyping && !webhookTyping ? "#FFFFFF" : "#6B7280"}
                   />
                 </TouchableOpacity>
               </View>
@@ -505,10 +646,17 @@ const styles = StyleSheet.create({
   statusDotTyping: {
     backgroundColor: '#F59E0B',
   },
+  statusDotWebhook: {
+    backgroundColor: '#3B82F6',
+  },
   headerSubtitle: {
     fontSize: 12,
     color: '#9CA3AF',
     fontWeight: '500',
+  },
+  webhookIndicator: {
+    marginLeft: 8,
+    padding: 2,
   },
   headerButton: {
     width: 36,
@@ -614,6 +762,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#2A2A2A',
   },
+  webhookBubble: {
+    borderColor: '#3B82F6',
+  },
   userText: {
     fontSize: 15,
     lineHeight: 20,
@@ -633,6 +784,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
+  messageFooterLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   userTime: {
     fontSize: 11,
     color: 'rgba(255,255,255,0.7)',
@@ -642,6 +798,11 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#9CA3AF',
     fontWeight: '400',
+  },
+  sourceLabel: {
+    fontSize: 9,
+    color: '#6B7280',
+    fontStyle: 'italic',
   },
   messageStatus: {
     marginLeft: 4,
@@ -657,6 +818,12 @@ const styles = StyleSheet.create({
     marginBottom: 4,
     borderWidth: 1,
     borderColor: '#2A2A2A',
+  },
+  webhookAvatar: {
+    borderColor: '#3B82F6',
+  },
+  n8nAvatar: {
+    borderColor: '#3B82F6',
   },
   typingContainer: {
     alignItems: 'flex-start',
@@ -685,6 +852,9 @@ const styles = StyleSheet.create({
     borderRadius: 3,
     backgroundColor: '#FF6B35',
   },
+  webhookDot: {
+    backgroundColor: '#3B82F6',
+  },
   typingLabel: {
     color: '#9CA3AF',
     fontSize: 12,
@@ -702,6 +872,9 @@ const styles = StyleSheet.create({
     height: 6,
     borderRadius: 3,
     backgroundColor: '#FF6B35',
+  },
+  webhookTypingDot: {
+    backgroundColor: '#3B82F6',
   },
   inputSection: {
     backgroundColor: '#151515',

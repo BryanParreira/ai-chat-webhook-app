@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import {
   View,
   Text,
-  TextInput,
   TouchableOpacity,
   ScrollView,
   StyleSheet,
@@ -11,13 +10,12 @@ import {
   Switch,
   Alert,
   Modal,
-  KeyboardAvoidingView,
-  Platform,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useThemeContext } from '../contexts/ThemeContext';
 import { useWebhookContext } from '../contexts/WebhookContext';
+// Import your simplified webhook screen
+import WebhookSetupScreen from './WebhookSetupScreen';
 
 interface SettingsScreenProps {
   onClose: () => void;
@@ -36,325 +34,6 @@ interface SettingsState {
   autoSave: boolean;
   messageHistory: number;
 }
-
-// Simple Webhook Management Component (inline)
-const SimpleWebhookScreen: React.FC<{ onClose: () => void }> = ({ onClose }) => {
-  const { webhooks, addWebhook, deleteWebhook, testWebhook } = useWebhookContext();
-  const [isAdding, setIsAdding] = useState(false);
-  const [formData, setFormData] = useState({
-    name: '',
-    url: '',
-    method: 'POST' as 'POST' | 'PUT' | 'PATCH',
-    headers: '{"Content-Type": "application/json"}',
-    body: '{"message": "{{message}}", "user": "{{user}}", "timestamp": "{{timestamp}}"}',
-    active: true
-  });
-
-  const resetForm = () => {
-    setFormData({
-      name: '',
-      url: '',
-      method: 'POST',
-      headers: '{"Content-Type": "application/json"}',
-      body: '{"message": "{{message}}", "user": "{{user}}", "timestamp": "{{timestamp}}"}',
-      active: true
-    });
-    setIsAdding(false);
-  };
-
-  const handleSubmit = async () => {
-    if (!formData.name.trim() || !formData.url.trim()) {
-      Alert.alert('Error', 'Please fill in name and URL');
-      return;
-    }
-
-    // Validate URL format
-    try {
-      new URL(formData.url);
-    } catch (error) {
-      Alert.alert('Error', 'Please enter a valid URL (must start with http:// or https://)');
-      return;
-    }
-
-    // Validate JSON headers
-    try {
-      JSON.parse(formData.headers);
-    } catch (error) {
-      Alert.alert('Error', 'Headers must be valid JSON format');
-      return;
-    }
-
-    // Validate JSON body
-    try {
-      JSON.parse(formData.body);
-    } catch (error) {
-      Alert.alert('Error', 'Body must be valid JSON format');
-      return;
-    }
-
-    try {
-      await addWebhook({
-        name: formData.name.trim(),
-        url: formData.url.trim(),
-        method: formData.method,
-        headers: formData.headers,
-        body: formData.body,
-        active: formData.active,
-      });
-      resetForm();
-      Alert.alert('Success', 'Webhook added successfully!');
-    } catch (error) {
-      Alert.alert('Error', 'Failed to add webhook. Please try again.');
-    }
-  };
-
-  const handleTest = async (webhook: any) => {
-    try {
-      const result = await testWebhook(webhook);
-      Alert.alert(
-        'Test Result', 
-        result.success 
-          ? `✓ Success (Status: ${result.status})\nResponse time: ${result.responseTime}ms` 
-          : `✗ Failed: ${result.error}`
-      );
-    } catch (error) {
-      Alert.alert('Error', 'Failed to test webhook');
-    }
-  };
-
-  const handleDelete = (webhook: any) => {
-    Alert.alert(
-      'Delete Webhook',
-      `Are you sure you want to delete "${webhook.name}"?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Delete', 
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await deleteWebhook(webhook.id);
-              Alert.alert('Success', 'Webhook deleted successfully');
-            } catch (error) {
-              Alert.alert('Error', 'Failed to delete webhook');
-            }
-          }
-        }
-      ]
-    );
-  };
-
-  const selectMethod = () => {
-    Alert.alert(
-      'Select HTTP Method',
-      'Choose the HTTP method for this webhook',
-      [
-        { text: 'POST', onPress: () => setFormData({ ...formData, method: 'POST' }) },
-        { text: 'PUT', onPress: () => setFormData({ ...formData, method: 'PUT' }) },
-        { text: 'PATCH', onPress: () => setFormData({ ...formData, method: 'PATCH' }) },
-        { text: 'Cancel', style: 'cancel' }
-      ]
-    );
-  };
-
-  return (
-    <SafeAreaView style={styles.webhookContainer}>
-      <StatusBar barStyle="light-content" backgroundColor="#0D0D0D" />
-      
-      {/* Header */}
-      <View style={styles.webhookHeader}>
-        <Text style={styles.webhookTitle}>Webhook Management</Text>
-        <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-          <Ionicons name="close" size={22} color="#9CA3AF" />
-        </TouchableOpacity>
-      </View>
-
-      <ScrollView style={styles.webhookContent} showsVerticalScrollIndicator={false}>
-        {/* Add Webhook Section */}
-        {!isAdding ? (
-          <TouchableOpacity 
-            style={styles.addWebhookButton}
-            onPress={() => setIsAdding(true)}
-          >
-            <Ionicons name="add" size={20} color="#FFFFFF" />
-            <Text style={styles.addWebhookText}>Add New Webhook</Text>
-          </TouchableOpacity>
-        ) : (
-          <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            style={styles.addFormContainer}
-          >
-            <View style={styles.addForm}>
-              <Text style={styles.formTitle}>Add New Webhook</Text>
-              
-              {/* Name Input */}
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Name *</Text>
-                <View style={styles.inputContainer}>
-                  <TextInput
-                    style={styles.textInput}
-                    value={formData.name}
-                    onChangeText={(text) => setFormData({ ...formData, name: text })}
-                    placeholder="My Webhook"
-                    placeholderTextColor="#6B7280"
-                    autoCapitalize="words"
-                  />
-                </View>
-              </View>
-
-              {/* URL Input */}
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>URL *</Text>
-                <View style={styles.inputContainer}>
-                  <TextInput
-                    style={styles.textInput}
-                    value={formData.url}
-                    onChangeText={(text) => setFormData({ ...formData, url: text })}
-                    placeholder="https://your-webhook-url.com/endpoint"
-                    placeholderTextColor="#6B7280"
-                    keyboardType="url"
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                  />
-                </View>
-              </View>
-
-              {/* Method and Active Toggle Row */}
-              <View style={styles.rowContainer}>
-                <View style={styles.methodContainer}>
-                  <Text style={styles.inputLabel}>Method</Text>
-                  <TouchableOpacity onPress={selectMethod} style={styles.methodSelector}>
-                    <Text style={styles.methodText}>{formData.method}</Text>
-                    <Ionicons name="chevron-down" size={16} color="#9CA3AF" />
-                  </TouchableOpacity>
-                </View>
-                
-                <View style={styles.toggleContainer}>
-                  <Text style={styles.inputLabel}>Active</Text>
-                  <Switch
-                    value={formData.active}
-                    onValueChange={(value) => setFormData({ ...formData, active: value })}
-                    trackColor={{ false: '#374151', true: '#FF6B35' }}
-                    thumbColor={formData.active ? '#ffffff' : '#f4f4f5'}
-                    ios_backgroundColor="#374151"
-                  />
-                </View>
-              </View>
-
-              {/* Headers Input */}
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Headers (JSON)</Text>
-                <View style={styles.textAreaContainer}>
-                  <TextInput
-                    style={styles.textArea}
-                    value={formData.headers}
-                    onChangeText={(text) => setFormData({ ...formData, headers: text })}
-                    placeholder='{"Authorization": "Bearer your-token"}'
-                    placeholderTextColor="#6B7280"
-                    multiline
-                    numberOfLines={3}
-                    textAlignVertical="top"
-                  />
-                </View>
-              </View>
-
-              {/* Body Template Input */}
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Body Template (JSON)</Text>
-                <View style={styles.textAreaContainer}>
-                  <TextInput
-                    style={styles.textArea}
-                    value={formData.body}
-                    onChangeText={(text) => setFormData({ ...formData, body: text })}
-                    multiline
-                    numberOfLines={4}
-                    textAlignVertical="top"
-                  />
-                </View>
-                <Text style={styles.helperText}>
-                  Use {"{{message}}"} for message content, {"{{user}}"} for username, {"{{timestamp}}"} for timestamp
-                </Text>
-              </View>
-
-              {/* Form Actions */}
-              <View style={styles.formActions}>
-                <TouchableOpacity 
-                  style={styles.submitButton}
-                  onPress={handleSubmit}
-                >
-                  <Text style={styles.submitButtonText}>Create Webhook</Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity 
-                  style={styles.cancelButton}
-                  onPress={resetForm}
-                >
-                  <Text style={styles.cancelButtonText}>Cancel</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </KeyboardAvoidingView>
-        )}
-
-        {/* Webhook List */}
-        <View style={styles.webhookList}>
-          {webhooks.map((webhook) => (
-            <View key={webhook.id} style={styles.webhookCard}>
-              <View style={styles.webhookCardHeader}>
-                <View style={styles.webhookInfo}>
-                  <Text style={styles.webhookName}>{webhook.name}</Text>
-                  <View style={[
-                    styles.statusBadge,
-                    webhook.active ? styles.statusActive : styles.statusInactive
-                  ]}>
-                    <Text style={[
-                      styles.statusText,
-                      webhook.active ? styles.statusTextActive : styles.statusTextInactive
-                    ]}>
-                      {webhook.active ? 'Active' : 'Inactive'}
-                    </Text>
-                  </View>
-                </View>
-                
-                <View style={styles.webhookActions}>
-                  <TouchableOpacity
-                    onPress={() => handleTest(webhook)}
-                    style={styles.actionButton}
-                  >
-                    <Ionicons name="checkmark" size={16} color="#3B82F6" />
-                  </TouchableOpacity>
-                  
-                  <TouchableOpacity
-                    onPress={() => handleDelete(webhook)}
-                    style={styles.actionButton}
-                  >
-                    <Ionicons name="trash-outline" size={16} color="#EF4444" />
-                  </TouchableOpacity>
-                </View>
-              </View>
-              
-              <Text style={styles.webhookUrl}>{webhook.url}</Text>
-              <Text style={styles.webhookMeta}>
-                {webhook.method} • {webhook.active ? 'Active' : 'Inactive'}
-                {webhook.lastTriggered && ` • Last triggered: ${new Date(webhook.lastTriggered).toLocaleDateString()}`}
-              </Text>
-            </View>
-          ))}
-          
-          {webhooks.length === 0 && !isAdding && (
-            <View style={styles.emptyState}>
-              <Ionicons name="link-outline" size={48} color="#6B7280" />
-              <Text style={styles.emptyStateTitle}>No webhooks configured</Text>
-              <Text style={styles.emptyStateSubtitle}>
-                Add your first webhook to get started with real-time notifications
-              </Text>
-            </View>
-          )}
-        </View>
-      </ScrollView>
-    </SafeAreaView>
-  );
-};
 
 const SettingsScreen: React.FC<SettingsScreenProps> = ({ onClose, onLogout, user }) => {
   const [activeTab, setActiveTab] = useState('general');
@@ -402,6 +81,28 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ onClose, onLogout, user
         { text: '1000 messages', onPress: () => updateSetting('messageHistory', 1000) },
         { text: 'Cancel', style: 'cancel' }
       ]
+    );
+  };
+
+  const handleExportData = () => {
+    Alert.alert(
+      'Export Data',
+      'Export your chat history and settings?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Export', onPress: () => {
+          // TODO: Implement export functionality
+          Alert.alert('Coming Soon', 'Data export feature will be available in a future update.');
+        }}
+      ]
+    );
+  };
+
+  const handlePrivacySettings = () => {
+    Alert.alert(
+      'Privacy & Security',
+      'Privacy settings will be available in a future update.',
+      [{ text: 'OK' }]
     );
   };
 
@@ -574,7 +275,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ onClose, onLogout, user
                 </TouchableOpacity>
 
                 {/* Export Data */}
-                <TouchableOpacity>
+                <TouchableOpacity onPress={handleExportData}>
                   <View style={styles.settingItem}>
                     <View style={styles.settingInfo}>
                       <View style={styles.settingIcon}>
@@ -590,7 +291,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ onClose, onLogout, user
                 </TouchableOpacity>
 
                 {/* Privacy */}
-                <TouchableOpacity>
+                <TouchableOpacity onPress={handlePrivacySettings}>
                   <View style={styles.settingItem}>
                     <View style={styles.settingInfo}>
                       <View style={styles.settingIcon}>
@@ -610,31 +311,40 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ onClose, onLogout, user
 
           {activeTab === 'webhooks' && (
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Webhook Settings</Text>
+              <Text style={styles.sectionTitle}>Automation & Webhooks</Text>
               
-              {/* Webhook Stats Card */}
+              {/* Quick Stats */}
               {webhooks.length > 0 && (
                 <View style={styles.statsCard}>
-                  <View style={styles.statsHeader}>
-                    <Ionicons name="analytics-outline" size={20} color="#FF6B35" />
-                    <Text style={styles.statsTitle}>Statistics</Text>
-                  </View>
-                  <View style={styles.statsGrid}>
+                  <View style={styles.statsRow}>
                     <View style={styles.statItem}>
-                      <Text style={styles.statValue}>{stats.totalWebhooks}</Text>
-                      <Text style={styles.statLabel}>Total</Text>
+                      <View style={styles.statIconContainer}>
+                        <Ionicons name="link" size={16} color="#FF6B35" />
+                      </View>
+                      <View>
+                        <Text style={styles.statValue}>{stats.totalWebhooks}</Text>
+                        <Text style={styles.statLabel}>Total</Text>
+                      </View>
                     </View>
+                    
                     <View style={styles.statItem}>
-                      <Text style={styles.statValue}>{stats.activeWebhooks}</Text>
-                      <Text style={styles.statLabel}>Active</Text>
+                      <View style={styles.statIconContainer}>
+                        <Ionicons name="checkmark-circle" size={16} color="#22C55E" />
+                      </View>
+                      <View>
+                        <Text style={styles.statValue}>{stats.activeWebhooks}</Text>
+                        <Text style={styles.statLabel}>Active</Text>
+                      </View>
                     </View>
+                    
                     <View style={styles.statItem}>
-                      <Text style={styles.statValue}>{stats.totalTriggers}</Text>
-                      <Text style={styles.statLabel}>Triggers</Text>
-                    </View>
-                    <View style={styles.statItem}>
-                      <Text style={styles.statValue}>{stats.successRate.toFixed(1)}%</Text>
-                      <Text style={styles.statLabel}>Success</Text>
+                      <View style={styles.statIconContainer}>
+                        <Ionicons name="trending-up" size={16} color="#3B82F6" />
+                      </View>
+                      <View>
+                        <Text style={styles.statValue}>{stats.successRate.toFixed(0)}%</Text>
+                        <Text style={styles.statLabel}>Success</Text>
+                      </View>
                     </View>
                   </View>
                 </View>
@@ -646,15 +356,17 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ onClose, onLogout, user
                 onPress={() => setShowWebhookScreen(true)}
               >
                 <View style={styles.webhookManageContent}>
-                  <View style={styles.webhookIcon}>
-                    <Ionicons name="link-outline" size={18} color="#FF6B35" />
+                  <View style={styles.webhookIconLarge}>
+                    <Ionicons name="link-outline" size={20} color="#FF6B35" />
                   </View>
                   <View style={styles.webhookManageText}>
-                    <Text style={styles.webhookManageTitle}>Manage Webhooks</Text>
+                    <Text style={styles.webhookManageTitle}>
+                      {webhooks.length > 0 ? 'Manage Webhooks' : 'Setup Webhooks'}
+                    </Text>
                     <Text style={styles.webhookManageDescription}>
                       {webhooks.length > 0 
-                        ? `Configure ${webhooks.length} webhook${webhooks.length !== 1 ? 's' : ''}`
-                        : 'Configure webhook endpoints for real-time notifications'
+                        ? `${webhooks.length} webhook${webhooks.length !== 1 ? 's' : ''} configured`
+                        : 'Connect with n8n, Zapier, and more'
                       }
                     </Text>
                   </View>
@@ -662,26 +374,81 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ onClose, onLogout, user
                 </View>
               </TouchableOpacity>
 
-              {/* Info Card */}
-              <View style={styles.webhookInfoCard}>
-                <View style={styles.webhookInfoHeader}>
-                  <Ionicons name="information-circle-outline" size={20} color="#FF6B35" />
-                  <Text style={styles.webhookInfoTitle}>About Webhooks</Text>
+              {/* Active Webhooks Preview */}
+              {webhooks.length > 0 && (
+                <View style={styles.webhookPreview}>
+                  <Text style={styles.previewTitle}>Active Webhooks</Text>
+                  {webhooks.slice(0, 3).map((webhook) => (
+                    <View key={webhook.id} style={styles.previewItem}>
+                      <View style={styles.previewIcon}>
+                        <Ionicons 
+                          name={webhook.active ? "checkmark-circle" : "pause-circle"} 
+                          size={16} 
+                          color={webhook.active ? "#22C55E" : "#6B7280"} 
+                        />
+                      </View>
+                      <View style={styles.previewInfo}>
+                        <Text style={styles.previewName}>{webhook.name}</Text>
+                        <Text style={styles.previewUrl} numberOfLines={1}>
+                          {webhook.url.replace(/^https?:\/\//, '')}
+                        </Text>
+                      </View>
+                      <Text style={styles.previewStatus}>
+                        {webhook.active ? 'Active' : 'Paused'}
+                      </Text>
+                    </View>
+                  ))}
+                  
+                  {webhooks.length > 3 && (
+                    <TouchableOpacity 
+                      style={styles.viewMoreButton}
+                      onPress={() => setShowWebhookScreen(true)}
+                    >
+                      <Text style={styles.viewMoreText}>
+                        View {webhooks.length - 3} more webhook{webhooks.length - 3 !== 1 ? 's' : ''}
+                      </Text>
+                      <Ionicons name="chevron-forward" size={14} color="#FF6B35" />
+                    </TouchableOpacity>
+                  )}
                 </View>
-                <Text style={styles.webhookInfoText}>
-                  Webhooks allow you to receive real-time notifications when messages are sent. 
-                  Configure endpoints to integrate with external services like Slack, Discord, or custom applications.
-                </Text>
-                
-                {webhooks.length === 0 && (
+              )}
+
+              {/* Info Card for new users */}
+              {webhooks.length === 0 && (
+                <View style={styles.webhookInfoCard}>
+                  <View style={styles.webhookInfoHeader}>
+                    <Ionicons name="information-circle-outline" size={20} color="#3B82F6" />
+                    <Text style={styles.webhookInfoTitle}>Automate with Webhooks</Text>
+                  </View>
+                  <Text style={styles.webhookInfoText}>
+                    Connect your messages to powerful automation tools like n8n, Zapier, or Make. 
+                    Set up workflows to send notifications, save data, or trigger any action automatically.
+                  </Text>
+                  
+                  <View style={styles.webhookBenefits}>
+                    <View style={styles.benefitItem}>
+                      <Ionicons name="flash" size={14} color="#FF6B35" />
+                      <Text style={styles.benefitText}>Real-time notifications</Text>
+                    </View>
+                    <View style={styles.benefitItem}>
+                      <Ionicons name="sync" size={14} color="#FF6B35" />
+                      <Text style={styles.benefitText}>Automatic data sync</Text>
+                    </View>
+                    <View style={styles.benefitItem}>
+                      <Ionicons name="globe" size={14} color="#FF6B35" />
+                      <Text style={styles.benefitText}>Connect anywhere</Text>
+                    </View>
+                  </View>
+
                   <TouchableOpacity 
                     style={styles.getStartedButton}
                     onPress={() => setShowWebhookScreen(true)}
                   >
                     <Text style={styles.getStartedButtonText}>Get Started</Text>
+                    <Ionicons name="arrow-forward" size={14} color="#FFFFFF" />
                   </TouchableOpacity>
-                )}
-              </View>
+                </View>
+              )}
             </View>
           )}
         </ScrollView>
@@ -697,14 +464,14 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ onClose, onLogout, user
         </View>
       </SafeAreaView>
 
-      {/* Simple Webhook Setup Modal */}
+      {/* Webhook Setup Modal */}
       <Modal
         visible={showWebhookScreen}
         animationType="slide"
         presentationStyle="fullScreen"
         onRequestClose={() => setShowWebhookScreen(false)}
       >
-        <SimpleWebhookScreen onClose={() => setShowWebhookScreen(false)} />
+        <WebhookSetupScreen onClose={() => setShowWebhookScreen(false)} />
       </Modal>
     </View>
   );
@@ -826,7 +593,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   settingsList: {
-    gap: 1,
+    gap: 8,
   },
   settingItem: {
     flexDirection: 'row',
@@ -836,7 +603,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 16,
     borderRadius: 12,
-    marginBottom: 8,
     borderWidth: 1,
     borderColor: '#2A2A2A',
   },
@@ -867,118 +633,182 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#9CA3AF',
   },
-  // Webhook styles
+  
+  // Webhook-specific styles
   statsCard: {
     backgroundColor: '#1F1F1F',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 20,
     borderWidth: 1,
     borderColor: '#2A2A2A',
   },
-  statsHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-    gap: 8,
-  },
-  statsTitle: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#FFFFFF',
-  },
-  statsGrid: {
+  statsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
   statItem: {
+    flexDirection: 'row',
     alignItems: 'center',
-    flex: 1,
+    gap: 10,
+  },
+  statIconContainer: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255, 107, 53, 0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   statValue: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '700',
-    color: '#FF6B35',
-    marginBottom: 4,
+    color: '#FFFFFF',
   },
   statLabel: {
-    fontSize: 12,
+    fontSize: 11,
     color: '#9CA3AF',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
   webhookManageButton: {
     backgroundColor: '#1F1F1F',
-    borderRadius: 12,
+    borderRadius: 16,
     borderWidth: 1,
     borderColor: '#2A2A2A',
-    marginBottom: 16,
+    marginBottom: 20,
   },
   webhookManageContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 16,
+    paddingHorizontal: 20,
+    paddingVertical: 20,
   },
-  webhookIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+  webhookIconLarge: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: 'rgba(255, 107, 53, 0.15)',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    marginRight: 16,
   },
   webhookManageText: {
     flex: 1,
   },
   webhookManageTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    marginBottom: 4,
+  },
+  webhookManageDescription: {
+    fontSize: 14,
+    color: '#9CA3AF',
+  },
+  webhookPreview: {
+    backgroundColor: '#1F1F1F',
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#2A2A2A',
+  },
+  previewTitle: {
     fontSize: 15,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    marginBottom: 16,
+  },
+  previewItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  previewIcon: {
+    marginRight: 12,
+  },
+  previewInfo: {
+    flex: 1,
+  },
+  previewName: {
+    fontSize: 14,
     fontWeight: '500',
     color: '#FFFFFF',
     marginBottom: 2,
   },
-  webhookManageDescription: {
-    fontSize: 13,
+  previewUrl: {
+    fontSize: 12,
+    color: '#6B7280',
+    fontFamily: 'monospace',
+  },
+  previewStatus: {
+    fontSize: 12,
     color: '#9CA3AF',
   },
+  viewMoreButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingTop: 8,
+    gap: 4,
+  },
+  viewMoreText: {
+    fontSize: 13,
+    color: '#FF6B35',
+    fontWeight: '500',
+  },
   webhookInfoCard: {
-    backgroundColor: 'rgba(255, 107, 53, 0.1)',
-    borderRadius: 12,
-    padding: 16,
+    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+    borderRadius: 16,
+    padding: 20,
     borderWidth: 1,
-    borderColor: 'rgba(255, 107, 53, 0.2)',
+    borderColor: 'rgba(59, 130, 246, 0.2)',
   },
   webhookInfoHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 12,
     gap: 8,
   },
   webhookInfoTitle: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '600',
     color: '#FFFFFF',
   },
   webhookInfoText: {
-    fontSize: 13,
+    fontSize: 14,
     color: '#9CA3AF',
-    lineHeight: 18,
-    marginBottom: 12,
+    lineHeight: 20,
+    marginBottom: 16,
+  },
+  webhookBenefits: {
+    gap: 8,
+    marginBottom: 20,
+  },
+  benefitItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  benefitText: {
+    fontSize: 13,
+    color: '#E5E7EB',
   },
   getStartedButton: {
     backgroundColor: '#FF6B35',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 12,
     alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   getStartedButtonText: {
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: '600',
     color: '#FFFFFF',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
   },
   footer: {
     backgroundColor: '#151515',
@@ -1005,251 +835,6 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '500',
     color: '#EF4444',
-  },
-  // Simple Webhook Screen Styles
-  webhookContainer: {
-    flex: 1,
-    backgroundColor: '#0D0D0D',
-  },
-  webhookHeader: {
-    backgroundColor: '#151515',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#262626',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  webhookTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#FFFFFF',
-  },
-  webhookContent: {
-    flex: 1,
-    paddingHorizontal: 20,
-  },
-  addWebhookButton: {
-    backgroundColor: '#FF6B35',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 14,
-    borderRadius: 12,
-    gap: 8,
-    marginVertical: 20,
-  },
-  addWebhookText: {
-    color: '#FFFFFF',
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  addFormContainer: {
-    marginVertical: 20,
-  },
-  addForm: {
-    backgroundColor: '#1F1F1F',
-    borderRadius: 12,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: '#2A2A2A',
-  },
-  formTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#FFFFFF',
-    marginBottom: 20,
-  },
-  inputGroup: {
-    marginBottom: 16,
-  },
-  inputLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#E5E7EB',
-    marginBottom: 8,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  inputContainer: {
-    backgroundColor: '#151515',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#2A2A2A',
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-  },
-  textInput: {
-    fontSize: 15,
-    color: '#FFFFFF',
-    fontWeight: '400',
-  },
-  rowContainer: {
-    flexDirection: 'row',
-    gap: 16,
-    marginBottom: 16,
-  },
-  methodContainer: {
-    flex: 1,
-  },
-  methodSelector: {
-    backgroundColor: '#151515',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#2A2A2A',
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  methodText: {
-    fontSize: 15,
-    color: '#FFFFFF',
-    fontWeight: '400',
-  },
-  toggleContainer: {
-    alignItems: 'center',
-    paddingTop: 8,
-  },
-  textAreaContainer: {
-    backgroundColor: '#151515',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#2A2A2A',
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-  },
-  textArea: {
-    fontSize: 13,
-    color: '#FFFFFF',
-    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-    minHeight: 60,
-  },
-  helperText: {
-    fontSize: 11,
-    color: '#6B7280',
-    marginTop: 6,
-    lineHeight: 16,
-  },
-  formActions: {
-    flexDirection: 'row',
-    gap: 12,
-    marginTop: 8,
-  },
-  submitButton: {
-    flex: 1,
-    backgroundColor: '#FF6B35',
-    paddingVertical: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  submitButtonText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  cancelButton: {
-    flex: 1,
-    backgroundColor: '#374151',
-    paddingVertical: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  cancelButtonText: {
-    color: '#9CA3AF',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  webhookList: {
-    paddingBottom: 20,
-  },
-  webhookCard: {
-    backgroundColor: '#1F1F1F',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#2A2A2A',
-  },
-  webhookCardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-  },
-  webhookInfo: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  webhookName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#FFFFFF',
-  },
-  statusBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  statusActive: {
-    backgroundColor: 'rgba(34, 197, 94, 0.2)',
-  },
-  statusInactive: {
-    backgroundColor: 'rgba(107, 114, 128, 0.2)',
-  },
-  statusText: {
-    fontSize: 10,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-  },
-  statusTextActive: {
-    color: '#22C55E',
-  },
-  statusTextInactive: {
-    color: '#6B7280',
-  },
-  webhookActions: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  actionButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#151515',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#2A2A2A',
-  },
-  webhookUrl: {
-    fontSize: 14,
-    color: '#9CA3AF',
-    marginBottom: 4,
-  },
-  webhookMeta: {
-    fontSize: 12,
-    color: '#6B7280',
-  },
-  emptyState: {
-    alignItems: 'center',
-    paddingVertical: 40,
-  },
-  emptyStateTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#9CA3AF',
-    marginTop: 16,
-    marginBottom: 4,
-  },
-  emptyStateSubtitle: {
-    fontSize: 14,
-    color: '#6B7280',
-    textAlign: 'center',
   },
 });
 

@@ -1,18 +1,19 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// Webhook Configuration and Validation
+// Webhook Configuration
 export const defaultWebhookConfig = {
-  url: '',
   method: 'POST',
   headers: {
     'Content-Type': 'application/json',
+    'User-Agent': 'MobileApp/1.0',
   },
-  timeout: 30000,
-  retries: 3,
+  timeout: 30000, // Increased for n8n responses
+  retries: 2,
   retryDelay: 1000,
 };
 
+// Validation utilities
 export const webhookValidation = {
   validateUrl: (url: string) => {
     if (!url) return { valid: false, message: 'URL is required' };
@@ -28,52 +29,35 @@ export const webhookValidation = {
     }
   },
 
-  validateHeaders: (headers: Record<string, string>) => {
-    if (!headers || typeof headers !== 'object') {
-      return { valid: true, message: 'Headers are optional' };
-    }
-    
-    for (const [key, value] of Object.entries(headers)) {
-      if (typeof key !== 'string' || typeof value !== 'string') {
-        return { valid: false, message: 'Headers must be key-value string pairs' };
-      }
-    }
-    
-    return { valid: true, message: 'Valid headers' };
-  },
-
-  validateTimeout: (timeout: number) => {
-    const timeoutNum = Number(timeout);
-    if (isNaN(timeoutNum) || timeoutNum < 1000 || timeoutNum > 120000) {
-      return { valid: false, message: 'Timeout must be between 1000ms and 120000ms' };
-    }
-    return { valid: true, message: 'Valid timeout' };
-  },
-
-  validateMethod: (method: string) => {
-    const validMethods = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'];
-    if (!validMethods.includes(method.toUpperCase())) {
-      return { valid: false, message: 'Invalid HTTP method' };
-    }
-    return { valid: true, message: 'Valid HTTP method' };
-  },
-
-  validateRetries: (retries: number) => {
-    const retriesNum = Number(retries);
-    if (isNaN(retriesNum) || retriesNum < 0 || retriesNum > 10) {
-      return { valid: false, message: 'Retries must be between 0 and 10' };
-    }
-    return { valid: true, message: 'Valid retry count' };
-  },
-
-  validateBody: (body: string) => {
-    if (!body) return { valid: true, message: 'Body is optional' };
-    
+  isN8nUrl: (url: string) => {
     try {
-      JSON.parse(body);
-      return { valid: true, message: 'Valid JSON body' };
-    } catch (error) {
-      return { valid: false, message: 'Body must be valid JSON' };
+      const urlObj = new URL(url);
+      return url.includes('/webhook/') || 
+             urlObj.hostname.includes('n8n') || 
+             url.includes('/api/webhook/');
+    } catch {
+      return false;
+    }
+  },
+
+  generateName: (url: string) => {
+    try {
+      const urlObj = new URL(url);
+      const hostname = urlObj.hostname;
+      
+      if (hostname.includes('n8n')) {
+        return 'n8n Workflow';
+      } else if (hostname.includes('zapier')) {
+        return 'Zapier Workflow';
+      } else if (hostname.includes('make')) {
+        return 'Make Workflow';
+      } else if (hostname.includes('integromat')) {
+        return 'Make Workflow';
+      } else {
+        return `Webhook (${hostname})`;
+      }
+    } catch {
+      return 'My Webhook';
     }
   },
 };
@@ -83,7 +67,7 @@ interface Webhook {
   id: string;
   name: string;
   url: string;
-  method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
+  method: 'POST' | 'PUT' | 'PATCH';
   headers: Record<string, string>;
   body: string;
   active: boolean;
@@ -92,24 +76,22 @@ interface Webhook {
   lastTriggered?: string;
   lastStatus?: number;
   lastError?: string;
-  triggerCount: number;
+  lastResponse?: any;
   successCount: number;
   failureCount: number;
   timeout: number;
   retries: number;
-  retryDelay: number;
 }
 
 interface WebhookCreateData {
-  name: string;
+  name?: string;
   url: string;
-  method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
+  method?: 'POST' | 'PUT' | 'PATCH';
   headers?: Record<string, string>;
   body?: string;
   active?: boolean;
   timeout?: number;
   retries?: number;
-  retryDelay?: number;
 }
 
 interface WebhookTestResult {
@@ -118,6 +100,16 @@ interface WebhookTestResult {
   error?: string;
   responseTime: number;
   timestamp: string;
+  responseData?: any;
+  testing?: boolean;
+}
+
+interface WebhookResponse {
+  success: boolean;
+  status?: number;
+  responseData?: any;
+  responseTime: number;
+  error?: string;
 }
 
 interface WebhookStats {
@@ -125,7 +117,6 @@ interface WebhookStats {
   activeWebhooks: number;
   totalTriggers: number;
   successRate: number;
-  averageResponseTime: number;
 }
 
 interface WebhookContextType {
@@ -134,13 +125,9 @@ interface WebhookContextType {
   updateWebhook: (id: string, data: Partial<WebhookCreateData>) => Promise<void>;
   deleteWebhook: (id: string) => Promise<void>;
   toggleWebhook: (id: string) => Promise<void>;
-  testWebhook: (webhook: Webhook) => Promise<WebhookTestResult>;
-  triggerWebhooks: (message: string, user?: string) => Promise<void>;
+  testWebhook: (webhook: Webhook | { id: string; url: string; method: string; headers: Record<string, string>; body: string; testPayload?: any }) => Promise<WebhookTestResult>;
+  triggerWebhooks: (message: string, user?: string, channel?: string, messageId?: string) => Promise<WebhookResponse[]>;
   getWebhookStats: () => WebhookStats;
-  validateWebhookData: (data: Partial<WebhookCreateData>) => { valid: boolean; errors: string[] };
-  clearWebhookStats: (id: string) => Promise<void>;
-  exportWebhooks: () => Promise<string>;
-  importWebhooks: (data: string) => Promise<{ success: number; errors: string[] }>;
   isLoading: boolean;
   error: string | null;
 }
@@ -148,7 +135,7 @@ interface WebhookContextType {
 const WebhookContext = createContext<WebhookContextType | undefined>(undefined);
 
 // Storage key
-const STORAGE_KEY = '@app_webhooks';
+const STORAGE_KEY = '@app_webhooks_v3';
 
 export const useWebhookContext = () => {
   const context = useContext(WebhookContext);
@@ -200,88 +187,34 @@ export const WebhookProvider: React.FC<WebhookProviderProps> = ({ children }) =>
     return Date.now().toString() + Math.random().toString(36).substr(2, 9);
   };
 
-  const validateWebhookData = (data: Partial<WebhookCreateData>) => {
-    const errors: string[] = [];
-
-    if (!data.name?.trim()) {
-      errors.push('Name is required');
-    }
-
-    if (data.url) {
-      const urlValidation = webhookValidation.validateUrl(data.url);
-      if (!urlValidation.valid) {
-        errors.push(urlValidation.message);
-      }
-    } else {
-      errors.push('URL is required');
-    }
-
-    if (data.method) {
-      const methodValidation = webhookValidation.validateMethod(data.method);
-      if (!methodValidation.valid) {
-        errors.push(methodValidation.message);
-      }
-    }
-
-    if (data.headers) {
-      const headersValidation = webhookValidation.validateHeaders(data.headers);
-      if (!headersValidation.valid) {
-        errors.push(headersValidation.message);
-      }
-    }
-
-    if (data.body) {
-      const bodyValidation = webhookValidation.validateBody(data.body);
-      if (!bodyValidation.valid) {
-        errors.push(bodyValidation.message);
-      }
-    }
-
-    if (data.timeout !== undefined) {
-      const timeoutValidation = webhookValidation.validateTimeout(data.timeout);
-      if (!timeoutValidation.valid) {
-        errors.push(timeoutValidation.message);
-      }
-    }
-
-    if (data.retries !== undefined) {
-      const retriesValidation = webhookValidation.validateRetries(data.retries);
-      if (!retriesValidation.valid) {
-        errors.push(retriesValidation.message);
-      }
-    }
-
-    return {
-      valid: errors.length === 0,
-      errors,
-    };
-  };
-
   const addWebhook = async (data: WebhookCreateData): Promise<string> => {
-    const validation = validateWebhookData(data);
+    const validation = webhookValidation.validateUrl(data.url);
     if (!validation.valid) {
-      throw new Error(validation.errors.join(', '));
+      throw new Error(validation.message);
     }
 
     const now = new Date().toISOString();
+    const finalName = data.name?.trim() || webhookValidation.generateName(data.url);
+    
     const newWebhook: Webhook = {
       id: generateId(),
-      name: data.name.trim(),
-      url: data.url,
-      method: data.method || defaultWebhookConfig.method as 'POST',
+      name: finalName,
+      url: data.url.trim(),
+      method: data.method || 'POST',
       headers: data.headers || defaultWebhookConfig.headers,
       body: data.body || JSON.stringify({
         message: '{{message}}',
         user: '{{user}}',
-        timestamp: '{{timestamp}}'
-      }),
+        timestamp: '{{timestamp}}',
+        channel: '{{channel}}',
+        messageId: '{{messageId}}',
+        app: 'mobile'
+      }, null, 2),
       active: data.active !== undefined ? data.active : true,
       timeout: data.timeout || defaultWebhookConfig.timeout,
       retries: data.retries || defaultWebhookConfig.retries,
-      retryDelay: data.retryDelay || defaultWebhookConfig.retryDelay,
       createdAt: now,
       updatedAt: now,
-      triggerCount: 0,
       successCount: 0,
       failureCount: 0,
     };
@@ -294,9 +227,11 @@ export const WebhookProvider: React.FC<WebhookProviderProps> = ({ children }) =>
   };
 
   const updateWebhook = async (id: string, data: Partial<WebhookCreateData>): Promise<void> => {
-    const validation = validateWebhookData(data);
-    if (!validation.valid) {
-      throw new Error(validation.errors.join(', '));
+    if (data.url) {
+      const validation = webhookValidation.validateUrl(data.url);
+      if (!validation.valid) {
+        throw new Error(validation.message);
+      }
     }
 
     const updatedWebhooks = webhooks.map(webhook => {
@@ -336,64 +271,121 @@ export const WebhookProvider: React.FC<WebhookProviderProps> = ({ children }) =>
     await saveWebhooks(updatedWebhooks);
   };
 
-  const testWebhook = async (webhook: Webhook): Promise<WebhookTestResult> => {
+  const testWebhook = async (webhook: any): Promise<WebhookTestResult> => {
     const startTime = Date.now();
     
     try {
-      const testData = {
-        message: 'Test message from Neural AI',
-        user: 'Test User',
+      const testData = webhook.testPayload || {
+        message: 'Test message from your mobile app',
+        user: 'TestUser',
         timestamp: new Date().toISOString(),
+        channel: 'test-channel',
+        messageId: `test-${Date.now()}`,
+        app: 'mobile',
+        test: true
       };
 
       let body = webhook.body;
-      body = body.replace(/\{\{message\}\}/g, testData.message);
-      body = body.replace(/\{\{user\}\}/g, testData.user);
-      body = body.replace(/\{\{timestamp\}\}/g, testData.timestamp);
+      if (typeof body === 'string') {
+        Object.keys(testData).forEach(key => {
+          const regex = new RegExp(`\\{\\{${key}\\}\\}`, 'g');
+          body = body.replace(regex, testData[key]);
+        });
+      } else {
+        body = JSON.stringify(testData);
+      }
 
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), webhook.timeout);
-
-      const response = await fetch(webhook.url, {
+      console.log('Testing webhook:', {
+        url: webhook.url,
         method: webhook.method,
         headers: webhook.headers,
-        body: webhook.method === 'GET' ? undefined : body,
+        body: body
+      });
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), webhook.timeout || 30000);
+
+      const response = await fetch(webhook.url, {
+        method: webhook.method || 'POST',
+        headers: webhook.headers || { 'Content-Type': 'application/json' },
+        body: body,
         signal: controller.signal,
       });
 
       clearTimeout(timeoutId);
       const responseTime = Date.now() - startTime;
 
-      return {
+      // Get response data from n8n
+      let responseData = null;
+      try {
+        const responseText = await response.text();
+        if (responseText) {
+          try {
+            responseData = JSON.parse(responseText);
+          } catch {
+            responseData = responseText;
+          }
+        }
+      } catch (error) {
+        console.log('No response body or failed to parse');
+      }
+
+      const result = {
         success: response.ok,
         status: response.status,
         responseTime,
         timestamp: new Date().toISOString(),
+        responseData: responseData
       };
+
+      console.log('Webhook test result:', result);
+      return result;
+
     } catch (error) {
       const responseTime = Date.now() - startTime;
-      return {
+      const result = {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error',
         responseTime,
         timestamp: new Date().toISOString(),
       };
+
+      console.log('Webhook test error:', result);
+      return result;
     }
   };
 
-  const triggerWebhook = async (webhook: Webhook, message: string, user?: string): Promise<void> => {
-    if (!webhook.active) return;
+  const triggerWebhook = async (
+    webhook: Webhook, 
+    message: string, 
+    user?: string, 
+    channel?: string, 
+    messageId?: string
+  ): Promise<WebhookResponse> => {
+    if (!webhook.active) {
+      return { success: false, error: 'Webhook is inactive', responseTime: 0 };
+    }
 
-    const startTime = Date.now();
     let attempt = 0;
-    let success = false;
+    let lastError = '';
+    const startTime = Date.now();
 
-    while (attempt <= webhook.retries && !success) {
+    while (attempt <= webhook.retries) {
       try {
+        const data = {
+          message,
+          user: user || 'Anonymous',
+          timestamp: new Date().toISOString(),
+          channel: channel || 'general',
+          messageId: messageId || `msg-${Date.now()}`,
+          app: 'mobile'
+        };
+
         let body = webhook.body;
-        body = body.replace(/\{\{message\}\}/g, message);
-        body = body.replace(/\{\{user\}\}/g, user || 'Anonymous');
-        body = body.replace(/\{\{timestamp\}\}/g, new Date().toISOString());
+        Object.keys(data).forEach(key => {
+          const regex = new RegExp(`\\{\\{${key}\\}\\}`, 'g');
+          body = body.replace(regex, data[key]);
+        });
 
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), webhook.timeout);
@@ -401,23 +393,38 @@ export const WebhookProvider: React.FC<WebhookProviderProps> = ({ children }) =>
         const response = await fetch(webhook.url, {
           method: webhook.method,
           headers: webhook.headers,
-          body: webhook.method === 'GET' ? undefined : body,
+          body: body,
           signal: controller.signal,
         });
 
         clearTimeout(timeoutId);
+        const responseTime = Date.now() - startTime;
+
+        // Get response data from n8n (important for bidirectional communication)
+        let responseData = null;
+        try {
+          const responseText = await response.text();
+          if (responseText) {
+            try {
+              responseData = JSON.parse(responseText);
+            } catch {
+              responseData = responseText;
+            }
+          }
+        } catch (error) {
+          console.log('No response body from webhook');
+        }
 
         if (response.ok) {
-          success = true;
           // Update success stats
           const updatedWebhooks = webhooks.map(w => {
             if (w.id === webhook.id) {
               return {
                 ...w,
-                triggerCount: w.triggerCount + 1,
                 successCount: w.successCount + 1,
                 lastTriggered: new Date().toISOString(),
                 lastStatus: response.status,
+                lastResponse: responseData,
                 lastError: undefined,
               };
             }
@@ -425,51 +432,82 @@ export const WebhookProvider: React.FC<WebhookProviderProps> = ({ children }) =>
           });
           setWebhooks(updatedWebhooks);
           await saveWebhooks(updatedWebhooks);
+
+          return {
+            success: true,
+            status: response.status,
+            responseData: responseData,
+            responseTime: responseTime
+          };
         } else {
           throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
+
       } catch (error) {
         attempt++;
+        lastError = error instanceof Error ? error.message : 'Unknown error';
+        
         if (attempt <= webhook.retries) {
           await new Promise(resolve => setTimeout(resolve, webhook.retryDelay));
-        } else {
-          // Update failure stats
-          const updatedWebhooks = webhooks.map(w => {
-            if (w.id === webhook.id) {
-              return {
-                ...w,
-                triggerCount: w.triggerCount + 1,
-                failureCount: w.failureCount + 1,
-                lastTriggered: new Date().toISOString(),
-                lastError: error instanceof Error ? error.message : 'Unknown error',
-              };
-            }
-            return w;
-          });
-          setWebhooks(updatedWebhooks);
-          await saveWebhooks(updatedWebhooks);
         }
       }
     }
+
+    // Update failure stats
+    const updatedWebhooks = webhooks.map(w => {
+      if (w.id === webhook.id) {
+        return {
+          ...w,
+          failureCount: w.failureCount + 1,
+          lastTriggered: new Date().toISOString(),
+          lastError: lastError,
+        };
+      }
+      return w;
+    });
+    setWebhooks(updatedWebhooks);
+    await saveWebhooks(updatedWebhooks);
+
+    return {
+      success: false,
+      error: lastError,
+      responseTime: Date.now() - startTime
+    };
   };
 
-  const triggerWebhooks = async (message: string, user?: string): Promise<void> => {
+  const triggerWebhooks = async (
+    message: string, 
+    user?: string, 
+    channel?: string, 
+    messageId?: string
+  ): Promise<WebhookResponse[]> => {
     const activeWebhooks = webhooks.filter(w => w.active);
     
-    // Trigger all webhooks in parallel
+    // Trigger all webhooks and collect responses
     const promises = activeWebhooks.map(webhook => 
-      triggerWebhook(webhook, message, user).catch(error => 
-        console.error(`Webhook ${webhook.name} failed:`, error)
-      )
+      triggerWebhook(webhook, message, user, channel, messageId)
     );
 
-    await Promise.allSettled(promises);
+    const results = await Promise.allSettled(promises);
+    
+    return results.map((result, index) => {
+      if (result.status === 'fulfilled') {
+        return result.value;
+      } else {
+        console.error(`Webhook ${activeWebhooks[index].name} failed:`, result.reason);
+        return {
+          success: false,
+          error: result.reason?.message || 'Promise rejected',
+          responseTime: 0
+        };
+      }
+    });
   };
 
   const getWebhookStats = (): WebhookStats => {
     const totalWebhooks = webhooks.length;
     const activeWebhooks = webhooks.filter(w => w.active).length;
-    const totalTriggers = webhooks.reduce((sum, w) => sum + w.triggerCount, 0);
+    const totalTriggers = webhooks.reduce((sum, w) => sum + w.successCount + w.failureCount, 0);
     const totalSuccesses = webhooks.reduce((sum, w) => sum + w.successCount, 0);
     const successRate = totalTriggers > 0 ? (totalSuccesses / totalTriggers) * 100 : 0;
 
@@ -478,100 +516,7 @@ export const WebhookProvider: React.FC<WebhookProviderProps> = ({ children }) =>
       activeWebhooks,
       totalTriggers,
       successRate: Math.round(successRate * 100) / 100,
-      averageResponseTime: 0, // Could be calculated from stored response times
     };
-  };
-
-  const clearWebhookStats = async (id: string): Promise<void> => {
-    const updatedWebhooks = webhooks.map(webhook => {
-      if (webhook.id === id) {
-        return {
-          ...webhook,
-          triggerCount: 0,
-          successCount: 0,
-          failureCount: 0,
-          lastTriggered: undefined,
-          lastStatus: undefined,
-          lastError: undefined,
-          updatedAt: new Date().toISOString(),
-        };
-      }
-      return webhook;
-    });
-
-    setWebhooks(updatedWebhooks);
-    await saveWebhooks(updatedWebhooks);
-  };
-
-  const exportWebhooks = async (): Promise<string> => {
-    const exportData = {
-      exportDate: new Date().toISOString(),
-      version: '1.0',
-      webhooks: webhooks.map(({ triggerCount, successCount, failureCount, lastTriggered, lastStatus, lastError, ...webhook }) => webhook),
-    };
-
-    return JSON.stringify(exportData, null, 2);
-  };
-
-  const importWebhooks = async (data: string): Promise<{ success: number; errors: string[] }> => {
-    try {
-      const importData = JSON.parse(data);
-      const errors: string[] = [];
-      let successCount = 0;
-
-      if (!importData.webhooks || !Array.isArray(importData.webhooks)) {
-        throw new Error('Invalid import format');
-      }
-
-      const newWebhooks: Webhook[] = [];
-
-      for (const webhookData of importData.webhooks) {
-        try {
-          const validation = validateWebhookData(webhookData);
-          if (!validation.valid) {
-            errors.push(`Webhook "${webhookData.name}": ${validation.errors.join(', ')}`);
-            continue;
-          }
-
-          const now = new Date().toISOString();
-          const webhook: Webhook = {
-            id: generateId(),
-            name: webhookData.name,
-            url: webhookData.url,
-            method: webhookData.method || 'POST',
-            headers: webhookData.headers || defaultWebhookConfig.headers,
-            body: webhookData.body || '{"message": "{{message}}"}',
-            active: webhookData.active !== undefined ? webhookData.active : true,
-            timeout: webhookData.timeout || defaultWebhookConfig.timeout,
-            retries: webhookData.retries || defaultWebhookConfig.retries,
-            retryDelay: webhookData.retryDelay || defaultWebhookConfig.retryDelay,
-            createdAt: now,
-            updatedAt: now,
-            triggerCount: 0,
-            successCount: 0,
-            failureCount: 0,
-          };
-
-          newWebhooks.push(webhook);
-          successCount++;
-        } catch (error) {
-          errors.push(`Webhook "${webhookData.name}": ${error instanceof Error ? error.message : 'Unknown error'}`);
-        }
-      }
-
-      if (newWebhooks.length > 0) {
-        const updatedWebhooks = [...webhooks, ...newWebhooks];
-        setWebhooks(updatedWebhooks);
-        await saveWebhooks(updatedWebhooks);
-      }
-
-      return { success: successCount, errors };
-    } catch (error) {
-      return { 
-        success: 0, 
-        errors: [error instanceof Error ? error.message : 'Failed to parse import data'] 
-      };
-    }
   };
 
   const contextValue: WebhookContextType = {
@@ -583,10 +528,6 @@ export const WebhookProvider: React.FC<WebhookProviderProps> = ({ children }) =>
     testWebhook,
     triggerWebhooks,
     getWebhookStats,
-    validateWebhookData,
-    clearWebhookStats,
-    exportWebhooks,
-    importWebhooks,
     isLoading,
     error,
   };
